@@ -1,0 +1,42 @@
+package main
+
+import (
+	"embed"
+	"io/fs"
+	"net/http"
+	"strings"
+)
+
+//go:embed all:dist
+distFS embed.FS
+
+func GetDistFS() http.FileSystem {
+	dist, err := fs.Sub(distFS, "dist")
+	if err != nil {
+		panic(err)
+	}
+	return http.FS(dist)
+}
+
+type SPAFileServer struct {
+	root http.FileSystem
+}
+
+func (s *SPAFileServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	
+	file, err := s.root.Open(path)
+	if err != nil {
+		r.URL.Path = "/"
+	} else {
+		file.Close()
+	}
+	
+	http.FileServer(s.root).ServeHTTP(w, r)
+}
+
+func SetupStaticRoutes(mux *http.ServeMux) {
+	staticFS := GetDistFS()
+	spaServer := &SPAFileServer{root: staticFS}
+	mux.Handle("/", spaServer)
+}
