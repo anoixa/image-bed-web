@@ -434,7 +434,7 @@ export default function Settings() {
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Endpoint</label>
                             <Input
-                              placeholder="http://localhost:9000"
+                              placeholder="192.168.10.3:9000"
                               onChange={(e) =>
                                 setNewStorage({
                                   ...newStorage,
@@ -446,7 +446,7 @@ export default function Settings() {
                           <div className="space-y-2">
                             <label className="text-sm font-medium">Bucket</label>
                             <Input
-                              placeholder="images"
+                              placeholder="image-pre"
                               onChange={(e) =>
                                 setNewStorage({
                                   ...newStorage,
