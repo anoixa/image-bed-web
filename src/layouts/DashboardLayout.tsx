@@ -11,10 +11,19 @@ import {
   User,
   BarChart3,
   X,
+  Key,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/store/auth';
 import { toast } from '@/components/ui/use-toast';
 import UploadModal from '@/components/UploadModal';
@@ -105,6 +114,17 @@ export default function DashboardLayout() {
   const searchQuery = searchParams.get('search') || '';
   // 本地输入状态，避免中文输入法问题
   const [inputValue, setInputValue] = useState(searchQuery);
+  const logout = useAuthStore((state) => state.logout);
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    toast({
+      title: '已退出',
+      description: '拜拜~',
+    });
+    navigate('/login');
+  };
 
   // 同步 URL 参数到本地状态
   useEffect(() => {
@@ -155,10 +175,10 @@ export default function DashboardLayout() {
   // 处理弹窗关闭
   const handleUploadOpenChange = (open: boolean) => {
     setIsUploadOpen(open);
-    // 弹窗关闭且有上传成功时刷新页面
+    // 弹窗关闭且有上传成功时刷新图片列表
     if (!open && hasUploadSuccess.current) {
       hasUploadSuccess.current = false;
-      window.location.reload();
+      window.dispatchEvent(new CustomEvent('images:refresh'));
     }
   };
 
@@ -228,9 +248,30 @@ export default function DashboardLayout() {
                 上传图片
               </Button>
               
-              <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center border border-slate-200">
-                <User className="w-5 h-5 text-slate-500" />
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center border border-slate-200 hover:bg-slate-300 transition-colors">
+                    <User className="w-5 h-5 text-slate-500" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem
+                    onClick={() => toast({ title: '敬请期待', description: '修改密码功能即将上线' })}
+                    className="cursor-pointer"
+                  >
+                    <Key className="mr-2 h-4 w-4" />
+                    修改密码
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    className="cursor-pointer text-red-600 focus:text-red-600"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    退出登录
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>

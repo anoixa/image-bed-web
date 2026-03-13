@@ -10,6 +10,63 @@ import { uploadImage } from '@/api/images';
 import { toast } from '@/components/ui/use-toast';
 import type { UploadImageResponse, Image } from '@/types';
 
+// 批量链接展示组件
+interface BatchLinksContentProps {
+  images: UploadImageResponse[];
+  format: 'url' | 'html' | 'markdown' | 'bbcode';
+  onCopyAll: () => void;
+}
+
+function BatchLinksContent({ images, format, onCopyAll }: BatchLinksContentProps) {
+  const getLinkValue = (image: UploadImageResponse) => {
+    const url = image.links?.url || image.links?.original || '';
+    const filename = image.filename || 'image';
+    
+    switch (format) {
+      case 'html':
+        return `<img src="${url}" alt="${filename}" />`;
+      case 'markdown':
+        return `![${filename}](${url})`;
+      case 'bbcode':
+        return `[img]${url}[/img]`;
+      case 'url':
+      default:
+        return url;
+    }
+  };
+
+  const allLinksText = images.map(getLinkValue).join('\n');
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-slate-500">共 {images.length} 张图片</span>
+        <Button variant="outline" size="sm" onClick={onCopyAll}>
+          <Copy className="mr-1 h-3 w-3" />
+          复制全部
+        </Button>
+      </div>
+      <div className="h-48 overflow-y-auto rounded-md border bg-slate-50 p-3">
+        <div className="space-y-2">
+          {images.map((image, index) => (
+            <div key={image.identifier} className="flex items-center gap-2 text-sm">
+              <span className="text-slate-400 w-6 shrink-0">{index + 1}.</span>
+              <code className="flex-1 truncate font-mono text-slate-700 bg-white px-2 py-1 rounded border">
+                {getLinkValue(image)}
+              </code>
+            </div>
+          ))}
+        </div>
+      </div>
+      <textarea
+        readOnly
+        value={allLinksText}
+        className="w-full h-20 font-mono text-xs bg-slate-100 border rounded-md p-2 resize-none"
+      />
+    </div>
+  );
+}
+
 interface UploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +96,8 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
   const [showLinks, setShowLinks] = useState(false);
   const [currentLinks, setCurrentLinks] = useState<LinkFormat[]>([]);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [allUploadedImages, setAllUploadedImages] = useState<UploadImageResponse[]>([]);
+  const [totalProgress, setTotalProgress] = useState(0);
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -131,10 +190,13 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
     if (files.length === 0 || files.every((f) => f.status === 'success')) return;
 
     setIsUploading(true);
+    setTotalProgress(0);
     const pendingFiles = files.filter((f) => f.status !== 'success');
     const uploadedImages: UploadImageResponse[] = [];
+    const total = pendingFiles.length;
 
-    for (const fileItem of pendingFiles) {
+    for (let i = 0; i < pendingFiles.length; i++) {
+      const fileItem = pendingFiles[i];
       updateFileStatus(fileItem.id, { status: 'uploading', progress: 10 });
       const progressInterval = simulateProgress(fileItem.id);
 
@@ -147,6 +209,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
           result: image,
         });
         uploadedImages.push(image);
+        setTotalProgress(Math.round(((i + 1) / total) * 100));
         onSuccess?.({
           identifier: image.identifier,
           filename: image.filename,
@@ -172,6 +235,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
     setIsUploading(false);
 
     if (uploadedImages.length > 0) {
+      setAllUploadedImages(uploadedImages);
       const lastImage = uploadedImages[uploadedImages.length - 1];
       const links = generateLinkFormats(lastImage);
       setCurrentLinks(links);
@@ -180,7 +244,23 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
       const urlLink = links.find((l) => l.key === 'url');
       if (urlLink) {
         try {
-          await navigator.clipboard.writeText(urlLink.value);
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(urlLink.value);
+          } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = urlLink.value;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-999999px';
+            textarea.style.top = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            const success = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (!success) {
+              throw new Error('execCommand copy failed');
+            }
+          }
           toast({
             title: '上传成功',
             description: '链接已自动复制到剪贴板',
@@ -203,15 +283,86 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
       setFiles([]);
       setShowLinks(false);
       setCurrentLinks([]);
+      setAllUploadedImages([]);
+      setTotalProgress(0);
       onOpenChange(false);
     }
   };
 
   const copyToClipboard = async (value: string, key: string) => {
     try {
-      await navigator.clipboard.writeText(value);
+      // 优先使用 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        // 回退方案：使用 execCommand（兼容 HTTP 环境）
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-999999px';
+        textarea.style.top = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!success) {
+          throw new Error('execCommand copy failed');
+        }
+      }
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 2000);
+    } catch {
+      toast({
+        title: '复制失败',
+        description: '请手动复制',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const copyAllLinks = async (format: 'url' | 'html' | 'markdown' | 'bbcode') => {
+    const getLinkValue = (image: UploadImageResponse) => {
+      const url = image.links?.url || image.links?.original || '';
+      const filename = image.filename || 'image';
+      
+      switch (format) {
+        case 'html':
+          return `<img src="${url}" alt="${filename}" />`;
+        case 'markdown':
+          return `![${filename}](${url})`;
+        case 'bbcode':
+          return `[img]${url}[/img]`;
+        case 'url':
+        default:
+          return url;
+      }
+    };
+
+    const allLinks = allUploadedImages.map(getLinkValue).join('\n');
+    
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(allLinks);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = allLinks;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-999999px';
+        textarea.style.top = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!success) {
+          throw new Error('execCommand copy failed');
+        }
+      }
+      toast({
+        title: '复制成功',
+        description: `已复制 ${allUploadedImages.length} 个链接`,
+      });
     } catch {
       toast({
         title: '复制失败',
@@ -233,7 +384,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg overflow-hidden">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{showLinks ? '上传成功' : '上传图片'}</DialogTitle>
         </DialogHeader>
@@ -245,7 +396,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
               initial={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.3 }}
-              className="space-y-4"
+              className="space-y-4 overflow-hidden flex flex-col"
             >
               {/* Drop Zone */}
               <motion.div
@@ -293,7 +444,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="space-y-3 max-h-64 overflow-y-auto"
+                    className="space-y-3 max-h-[50vh] overflow-y-auto"
                   >
                     {files.map((fileItem) => (
                       <motion.div
@@ -365,6 +516,17 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
                 )}
               </AnimatePresence>
 
+              {/* Total Progress */}
+              {isUploading && files.length > 1 && (
+                <div className="space-y-2 p-3 bg-indigo-50 rounded-lg">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-indigo-700 font-medium">总进度</span>
+                    <span className="text-indigo-700">{totalProgress}%</span>
+                  </div>
+                  <Progress value={totalProgress} className="h-2" />
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">
                 <Button variant="outline" onClick={handleClose} disabled={isUploading}>
@@ -419,39 +581,81 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
                 )}
               </div>
 
-              {/* Link Selector Tabs */}
-              <Tabs defaultValue="url" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  {currentLinks.map((link) => (
-                    <TabsTrigger key={link.key} value={link.key}>
-                      {link.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {currentLinks.map((link) => (
-                  <TabsContent key={link.key} value={link.key}>
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={link.value}
-                        className="flex-1 font-mono text-sm bg-slate-50"
+              {/* Batch Links Display */}
+              {allUploadedImages.length > 1 ? (
+                <div className="space-y-4">
+                  <Tabs defaultValue="url" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
+                      <TabsTrigger value="url">URL</TabsTrigger>
+                      <TabsTrigger value="html">HTML</TabsTrigger>
+                      <TabsTrigger value="markdown">Markdown</TabsTrigger>
+                      <TabsTrigger value="bbcode">BBCode</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="url" className="mt-4">
+                      <BatchLinksContent
+                        images={allUploadedImages}
+                        format="url"
+                        onCopyAll={() => copyAllLinks('url')}
                       />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => copyToClipboard(link.value, link.key)}
-                        className="shrink-0"
-                      >
-                        {copiedKey === link.key ? (
-                          <Check className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </TabsContent>
-                ))}
-              </Tabs>
+                    </TabsContent>
+                    <TabsContent value="html" className="mt-4">
+                      <BatchLinksContent
+                        images={allUploadedImages}
+                        format="html"
+                        onCopyAll={() => copyAllLinks('html')}
+                      />
+                    </TabsContent>
+                    <TabsContent value="markdown" className="mt-4">
+                      <BatchLinksContent
+                        images={allUploadedImages}
+                        format="markdown"
+                        onCopyAll={() => copyAllLinks('markdown')}
+                      />
+                    </TabsContent>
+                    <TabsContent value="bbcode" className="mt-4">
+                      <BatchLinksContent
+                        images={allUploadedImages}
+                        format="bbcode"
+                        onCopyAll={() => copyAllLinks('bbcode')}
+                      />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              ) : (
+                /* Single File Links */
+                <Tabs defaultValue="url" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4">
+                    {currentLinks.map((link) => (
+                      <TabsTrigger key={link.key} value={link.key}>
+                        {link.label}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {currentLinks.map((link) => (
+                    <TabsContent key={link.key} value={link.key}>
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={link.value}
+                          className="flex-1 font-mono text-sm bg-slate-50"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => copyToClipboard(link.value, link.key)}
+                          className="shrink-0"
+                        >
+                          {copiedKey === link.key ? (
+                            <Check className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              )}
 
               {/* Actions */}
               <div className="flex justify-end gap-3 pt-4">

@@ -1,5 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Folder, Plus, Trash2, Edit2, X, Check, Loader2, Image, ExternalLink } from 'lucide-react';
+
+// 相册封面组件
+function AlbumCover({ coverUrl, name }: { coverUrl?: string; name: string }) {
+  const [hasError, setHasError] = useState(false);
+  const hasCover = coverUrl && coverUrl.trim() !== '';
+
+  if (!hasCover || hasError) {
+    return <Folder className="w-6 h-6 text-indigo-600" />;
+  }
+
+  return (
+    <img
+      src={coverUrl}
+      alt=""
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => setHasError(true)}
+    />
+  );
+}
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -236,16 +256,7 @@ export default function Albums() {
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center overflow-hidden">
-                            {album.cover_url ? (
-                              <img
-                                src={album.cover_url}
-                                alt={album.name}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <Folder className="w-6 h-6 text-indigo-600" />
-                            )}
+                            <AlbumCover coverUrl={album.cover_url} name={album.name} />
                           </div>
                           <div>
                             <h3 className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors">

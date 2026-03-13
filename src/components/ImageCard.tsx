@@ -40,7 +40,23 @@ export default function ImageCard({ image, onDelete, currentAlbumId, onAlbumChan
       return;
     }
     try {
-      await navigator.clipboard.writeText(originalUrl);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(originalUrl);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = originalUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-999999px';
+        textarea.style.top = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (!success) {
+          throw new Error('execCommand copy failed');
+        }
+      }
       toast({
         title: '链接已复制',
         description: '图片链接已复制到剪贴板',

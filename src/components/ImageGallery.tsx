@@ -163,6 +163,15 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [loadImages, images.length]);
 
+  // 监听外部刷新事件（如上传成功后）
+  useEffect(() => {
+    const handleRefresh = () => {
+      loadImages(1, false);
+    };
+    window.addEventListener('images:refresh', handleRefresh);
+    return () => window.removeEventListener('images:refresh', handleRefresh);
+  }, [loadImages]);
+
   useEffect(() => {
     if (!hasInitialized.current) {
       loadImages(1, false);
