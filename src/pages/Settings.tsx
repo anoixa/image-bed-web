@@ -39,6 +39,7 @@ export default function Settings() {
   const [isCreateStorageOpen, setIsCreateStorageOpen] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
   const [createdToken, setCreatedToken] = useState<{ token: string; hash: string } | null>(null);
+  const [activeTab, setActiveTab] = useState('storage');
 
   // 确认弹窗状态
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -164,6 +165,7 @@ export default function Settings() {
       const token = await createToken(newTokenName);
       setCreatedToken(token);
       setNewTokenName('');
+      setActiveTab('tokens');  // 创建成功后自动切换到 tokens 选项卡
       loadData();
     } catch (error) {
       toast({
@@ -403,7 +405,7 @@ export default function Settings() {
         <p className="text-slate-500 mt-1">管理 API Token 和存储配置</p>
       </div>
 
-      <Tabs defaultValue="storage" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="storage">存储配置</TabsTrigger>
           <TabsTrigger value="background">登录背景</TabsTrigger>
