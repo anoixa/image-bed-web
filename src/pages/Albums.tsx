@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Folder, Plus, Trash2, Edit2, X, Check, Loader2, Image, ExternalLink } from 'lucide-react';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 // 相册封面组件
 function AlbumCover({ coverUrl, name }: { coverUrl?: string; name: string }) {
@@ -44,6 +45,20 @@ export default function Albums() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+
+  // 确认弹窗状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'destructive' | 'default';
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
   const loadAlbums = useCallback(async () => {
     setLoading(true);
@@ -120,22 +135,28 @@ export default function Albums() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定要删除这个相册吗？')) return;
-
-    try {
-      await deleteAlbum(id);
-      toast({
-        title: '删除成功',
-        description: '相册已删除',
-      });
-      loadAlbums();
-    } catch (error) {
-      toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    }
+    setConfirmDialog({
+      open: true,
+      title: '删除相册',
+      description: '确定要删除这个相册吗？相册中的图片不会被删除。',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await deleteAlbum(id);
+          toast({
+            title: '删除成功',
+            description: '相册已删除',
+          });
+          loadAlbums();
+        } catch (error) {
+          toast({
+            title: '删除失败',
+            description: error instanceof Error ? error.message : '请稍后重试',
+            variant: 'destructive',
+          });
+        }
+      },
+    });
   };
 
   const startEditing = (album: Album) => {
@@ -305,6 +326,16 @@ export default function Albums() {
           ))}
         </div>
       )}
+
+      {/* 确认弹窗 */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }

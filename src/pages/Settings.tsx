@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Key, Plus, Trash2, Copy, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon } from 'lucide-react';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +39,20 @@ export default function Settings() {
   const [isCreateStorageOpen, setIsCreateStorageOpen] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
   const [createdToken, setCreatedToken] = useState<{ token: string; hash: string } | null>(null);
+
+  // 确认弹窗状态
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    onConfirm: () => void;
+    variant?: 'destructive' | 'default';
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  });
 
   // 随机图源相册配置
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -160,22 +175,28 @@ export default function Settings() {
   };
 
   const handleDeleteToken = async (id: number) => {
-    if (!confirm('确定要删除这个Token吗？')) return;
-
-    try {
-      await deleteToken(id);
-      toast({
-        title: '删除成功',
-        description: 'Token已删除',
-      });
-      loadData();
-    } catch (error) {
-      toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    }
+    setConfirmDialog({
+      open: true,
+      title: '删除 Token',
+      description: '确定要删除这个 Token 吗？删除后将无法恢复。',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await deleteToken(id);
+          toast({
+            title: '删除成功',
+            description: 'Token 已删除',
+          });
+          loadData();
+        } catch (error) {
+          toast({
+            title: '删除失败',
+            description: error instanceof Error ? error.message : '请稍后重试',
+            variant: 'destructive',
+          });
+        }
+      },
+    });
   };
 
   const handleCopyToken = async (token: string) => {
@@ -271,22 +292,28 @@ export default function Settings() {
   };
 
   const handleDeleteStorage = async (id: number) => {
-    if (!confirm('确定要删除这个存储配置吗？')) return;
-
-    try {
-      await deleteStorageConfig(id);
-      toast({
-        title: '删除成功',
-        description: '存储配置已删除',
-      });
-      loadData();
-    } catch (error) {
-      toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    }
+    setConfirmDialog({
+      open: true,
+      title: '删除存储配置',
+      description: '确定要删除这个存储配置吗？删除后将无法恢复。',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          await deleteStorageConfig(id);
+          toast({
+            title: '删除成功',
+            description: '存储配置已删除',
+          });
+          loadData();
+        } catch (error) {
+          toast({
+            title: '删除失败',
+            description: error instanceof Error ? error.message : '请稍后重试',
+            variant: 'destructive',
+          });
+        }
+      },
+    });
   };
 
   const handleSetDefaultStorage = async (id: number) => {
@@ -866,6 +893,16 @@ export default function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 确认弹窗 */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        onConfirm={confirmDialog.onConfirm}
+        variant={confirmDialog.variant}
+      />
     </div>
   );
 }
