@@ -177,6 +177,43 @@ export interface HealthCheck {
   };
 }
 
+// 系统状态
+export interface SystemStatus {
+  // 数据库状态
+  database: {
+    status: string;
+    message?: string;
+  };
+  // 存储状态
+  storage: {
+    status: string;
+    type: string;
+    message?: string;
+  };
+  // 缓存状态
+  cache: {
+    status: string;
+    message?: string;
+  };
+  // 系统运行时间
+  uptime: string;
+  // 内存使用
+  memory: {
+    used: number;
+    total: number;
+    usage_percent: number;
+  };
+  // Go 运行时信息
+  go_version: string;
+  goroutines: number;
+  // 图片统计
+  images: {
+    total: number;
+    public: number;
+    private: number;
+  };
+}
+
 // Dashboard 统计数据 - 实际后端返回的嵌套结构
 export interface DashboardStats {
   overview: {

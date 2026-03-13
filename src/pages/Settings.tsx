@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { fetchTokens, createToken, deleteToken } from '@/api/tokens';
-import { fetchVersion } from '@/api/system';
+import { fetchVersion, fetchSystemStatus } from '@/api/system';
 import { fetchAlbums } from '@/api/albums';
 import {
   fetchStorageConfigs,
@@ -25,7 +25,7 @@ import {
   fetchRandomSourceAlbum,
   updateRandomSourceAlbum
 } from '@/api/images';
-import type { Token, SystemInfo, StorageConfig, Album, RandomSourceAlbumConfig } from '@/types';
+import type { Token, SystemInfo, StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function Settings() {
   const [tokens, setTokens] = useState<Token[]>([]);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateTokenOpen, setIsCreateTokenOpen] = useState(false);
@@ -78,12 +79,13 @@ export default function Settings() {
     setLoading(true);
     try {
       // 分别处理每个请求，避免一个失败影响其他请求
-      const [tokensResult, versionResult, storageResult, albumsResult, randomSourceResult] = await Promise.allSettled([
+      const [tokensResult, versionResult, storageResult, albumsResult, randomSourceResult, systemStatusResult] = await Promise.allSettled([
         fetchTokens(),
         fetchVersion(),
         fetchStorageConfigs(),
         fetchAlbums(),
         fetchRandomSourceAlbum(),
+        fetchSystemStatus(),
       ]);
 
       // 处理 Token 数据
@@ -135,6 +137,13 @@ export default function Settings() {
       } else {
         console.error('加载随机图源相册配置失败:', randomSourceResult.reason);
         setRandomSourceAlbum(null);
+      }
+
+      // 处理系统状态
+      if (systemStatusResult.status === 'fulfilled') {
+        setSystemStatus(systemStatusResult.value);
+      } else {
+        console.error('加载系统状态失败:', systemStatusResult.reason);
       }
     } catch (error) {
       toast({
@@ -895,7 +904,8 @@ export default function Settings() {
                 系统信息
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* 版本信息 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-slate-500">版本</p>
@@ -908,6 +918,93 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+
+              {/* 系统状态 */}
+              {systemStatus && (
+                <>
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">运行状态</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-500">数据库</p>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${systemStatus.database.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className="font-medium text-sm">{systemStatus.database.status === 'ok' ? '正常' : '异常'}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">存储</p>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${systemStatus.storage.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className="font-medium text-sm">{systemStatus.storage.status === 'ok' ? '正常' : '异常'}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">缓存</p>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${systemStatus.cache.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className="font-medium text-sm">{systemStatus.cache.status === 'ok' ? '正常' : '异常'}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">运行时间</p>
+                        <p className="font-medium text-sm">{systemStatus.uptime}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 内存使用 */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">内存使用</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">{systemStatus.memory.used} MB / {systemStatus.memory.total} MB</span>
+                        <span className="font-medium">{systemStatus.memory.usage_percent.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${systemStatus.memory.usage_percent > 80 ? 'bg-red-500' : systemStatus.memory.usage_percent > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                          style={{ width: `${systemStatus.memory.usage_percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 运行时信息 */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">运行时信息</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-500">Go 版本</p>
+                        <p className="font-medium text-sm font-mono">{systemStatus.go_version}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Goroutines</p>
+                        <p className="font-medium text-sm">{systemStatus.goroutines}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 图片统计 */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">图片统计</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-slate-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-slate-800">{systemStatus.images.total}</p>
+                        <p className="text-xs text-slate-500">总图片数</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-green-600">{systemStatus.images.public}</p>
+                        <p className="text-xs text-slate-500">公开</p>
+                      </div>
+                      <div className="bg-slate-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-slate-600">{systemStatus.images.private}</p>
+                        <p className="text-xs text-slate-500">私有</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
