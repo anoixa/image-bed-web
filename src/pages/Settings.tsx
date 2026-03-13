@@ -113,7 +113,9 @@ export default function Settings() {
 
       // 处理随机图源相册配置
       if (randomSourceResult.status === 'fulfilled') {
-        setRandomSourceAlbum(randomSourceResult.value.album_id);
+        // album_id 为 0 时表示"所有公开图片"，转换为 null
+        const albumId = randomSourceResult.value.album_id;
+        setRandomSourceAlbum(albumId === 0 ? null : albumId);
       } else {
         console.error('加载随机图源相册配置失败:', randomSourceResult.reason);
         setRandomSourceAlbum(null);
