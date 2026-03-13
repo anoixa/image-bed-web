@@ -525,6 +525,23 @@ export default function Settings() {
                               }
                             />
                           </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id="minio-ssl"
+                              checked={newStorage.config.use_ssl === 'true'}
+                              onChange={(e) =>
+                                setNewStorage({
+                                  ...newStorage,
+                                  config: { ...newStorage.config, use_ssl: String(e.target.checked) },
+                                })
+                              }
+                              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <label htmlFor="minio-ssl" className="text-sm text-slate-700">
+                              使用 SSL/TLS (HTTPS)
+                            </label>
+                          </div>
                         </>
                       )}
 
