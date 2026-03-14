@@ -8,6 +8,7 @@ import Dashboard from '@/pages/Dashboard';
 import Albums from '@/pages/Albums';
 import Settings from '@/pages/Settings';
 import { Toaster } from '@/components/ui/toaster';
+import HttpsWarning from '@/components/HttpsWarning';
 
 // 受保护的路由组件
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -77,6 +78,7 @@ function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <HttpsWarning />
       <Toaster />
     </BrowserRouter>
   );
