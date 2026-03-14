@@ -324,3 +324,32 @@ export interface RandomSourceAlbumConfig {
   album_id: number | null;
   include_all_public?: boolean;
 }
+
+// Transfer Mode 类型
+export type TransferMode = 'auto' | 'always_proxy' | 'always_direct';
+
+// Transfer Mode 配置
+export interface TransferModeConfig {
+  mode: TransferMode;
+  updated_at?: string;
+}
+
+// Transfer Mode 配置请求
+export interface TransferModeRequest {
+  mode: TransferMode;
+}
+
+// MinIO 存储配置扩展（用于前端表单）
+export interface MinIOConfig {
+  type: 'minio';
+  endpoint: string;
+  bucket_name: string;
+  access_key_id: string;
+  secret_access_key: string;
+  use_ssl?: string;
+  // Direct Link 相关配置
+  enable_direct_link?: boolean;
+  public_endpoint?: string;
+  is_public_bucket?: boolean;
+  transfer_mode?: TransferMode;
+}

@@ -1,5 +1,5 @@
 import { get, post, put, del } from '@/lib/request';
-import type { StorageConfig, CreateStorageConfigRequest, TestConfigRequest, TestConfigResponse, ConfigCategory } from '@/types';
+import type { StorageConfig, CreateStorageConfigRequest, TestConfigRequest, TestConfigResponse, ConfigCategory, TransferModeConfig, TransferModeRequest } from '@/types';
 
 // 获取存储配置列表 - GET /api/v1/admin/configs
 export const fetchStorageConfigs = (category?: ConfigCategory, enabledOnly?: boolean): Promise<StorageConfig[]> => {
@@ -63,4 +63,14 @@ export const fetchStorageProviders = (): Promise<{ category: string; name: strin
 // 重新加载存储配置 - POST /api/v1/admin/storage/reload/{id}
 export const reloadStorageConfig = (id: number): Promise<void> => {
   return post(`/api/v1/admin/storage/reload/${id}`);
+};
+
+// 获取全局 Transfer Mode 配置 - GET /api/v1/admin/transfer-mode
+export const fetchTransferMode = (): Promise<TransferModeConfig> => {
+  return get<TransferModeConfig>('/api/v1/admin/transfer-mode');
+};
+
+// 更新全局 Transfer Mode 配置 - POST /api/v1/admin/transfer-mode
+export const updateTransferMode = (data: TransferModeRequest): Promise<TransferModeConfig> => {
+  return post<TransferModeConfig>('/api/v1/admin/transfer-mode', data);
 };

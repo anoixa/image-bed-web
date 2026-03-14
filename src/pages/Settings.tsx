@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Key, Plus, Trash2, Copy, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,13 +19,15 @@ import {
   createStorageConfig,
   deleteStorageConfig,
   setDefaultStorageConfig,
-  testStorageConfig
+  testStorageConfig,
+  fetchTransferMode,
+  updateTransferMode
 } from '@/api/configs';
 import {
   fetchRandomSourceAlbum,
   updateRandomSourceAlbum
 } from '@/api/images';
-import type { Token, SystemInfo, StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus } from '@/types';
+import type { Token, SystemInfo, StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,6 +63,10 @@ export default function Settings() {
   const [randomSourceAlbum, setRandomSourceAlbum] = useState<number | null>(null);
   const [isUpdatingRandomSource, setIsUpdatingRandomSource] = useState(false);
 
+  // Transfer Mode 配置
+  const [transferMode, setTransferMode] = useState<TransferMode>('auto');
+  const [isUpdatingTransferMode, setIsUpdatingTransferMode] = useState(false);
+
   // 存储配置表单 - category 固定为 'storage'，存储类型放在 config.type 中
   const [newStorage, setNewStorage] = useState<{
     name: string;
@@ -79,13 +85,14 @@ export default function Settings() {
     setLoading(true);
     try {
       // 分别处理每个请求，避免一个失败影响其他请求
-      const [tokensResult, versionResult, storageResult, albumsResult, randomSourceResult, systemStatusResult] = await Promise.allSettled([
+      const [tokensResult, versionResult, storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult] = await Promise.allSettled([
         fetchTokens(),
         fetchVersion(),
         fetchStorageConfigs(),
         fetchAlbums(),
         fetchRandomSourceAlbum(),
         fetchSystemStatus(),
+        fetchTransferMode(),
       ]);
 
       // 处理 Token 数据
@@ -144,6 +151,14 @@ export default function Settings() {
         setSystemStatus(systemStatusResult.value);
       } else {
         console.error('加载系统状态失败:', systemStatusResult.reason);
+      }
+
+      // 处理 Transfer Mode 配置
+      if (transferModeResult.status === 'fulfilled') {
+        setTransferMode(transferModeResult.value.mode);
+      } else {
+        console.error('加载 Transfer Mode 配置失败:', transferModeResult.reason);
+        setTransferMode('auto');
       }
     } catch (error) {
       toast({
@@ -262,6 +277,27 @@ export default function Settings() {
       });
     } finally {
       setIsUpdatingRandomSource(false);
+    }
+  };
+
+  // 更新 Transfer Mode
+  const handleUpdateTransferMode = async (mode: TransferMode) => {
+    setIsUpdatingTransferMode(true);
+    try {
+      const result = await updateTransferMode({ mode });
+      setTransferMode(result.mode);
+      toast({
+        title: '设置成功',
+        description: `全局传输模式已更新为：${mode === 'auto' ? '自动' : mode === 'always_proxy' ? '始终代理' : '始终直链'}`,
+      });
+    } catch (error) {
+      toast({
+        title: '设置失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingTransferMode(false);
     }
   };
 
@@ -415,8 +451,9 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="storage">存储配置</TabsTrigger>
+          <TabsTrigger value="transfer">传输设置</TabsTrigger>
           <TabsTrigger value="background">登录背景</TabsTrigger>
           <TabsTrigger value="tokens">API Token</TabsTrigger>
           <TabsTrigger value="system">系统信息</TabsTrigger>
@@ -550,6 +587,90 @@ export default function Settings() {
                             <label htmlFor="minio-ssl" className="text-sm text-slate-700">
                               使用 SSL/TLS (HTTPS)
                             </label>
+                          </div>
+
+                          {/* Direct Link 配置 */}
+                          <div className="border-t pt-4 mt-4">
+                            <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                              <Link2 className="h-4 w-4" />
+                              直链访问配置
+                            </h4>
+
+                            <div className="space-y-4">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id="minio-enable-direct-link"
+                                  checked={newStorage.config.enable_direct_link === 'true'}
+                                  onChange={(e) =>
+                                    setNewStorage({
+                                      ...newStorage,
+                                      config: { ...newStorage.config, enable_direct_link: String(e.target.checked) },
+                                    })
+                                  }
+                                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <label htmlFor="minio-enable-direct-link" className="text-sm text-slate-700">
+                                  启用直链访问
+                                </label>
+                              </div>
+
+                              {newStorage.config.enable_direct_link === 'true' && (
+                                <>
+                                  <div className="space-y-2">
+                                    <label className="text-sm font-medium">Public Endpoint (CDN URL)</label>
+                                    <Input
+                                      placeholder="https://cdn.example.com"
+                                      onChange={(e) =>
+                                        setNewStorage({
+                                          ...newStorage,
+                                          config: { ...newStorage.config, public_endpoint: e.target.value },
+                                        })
+                                      }
+                                    />
+                                    <p className="text-xs text-slate-500">
+                                      可选，用于 CDN 加速，留空则使用 MinIO Endpoint
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      id="minio-public-bucket"
+                                      checked={newStorage.config.is_public_bucket === 'true'}
+                                      onChange={(e) =>
+                                        setNewStorage({
+                                          ...newStorage,
+                                          config: { ...newStorage.config, is_public_bucket: String(e.target.checked) },
+                                        })
+                                      }
+                                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <label htmlFor="minio-public-bucket" className="text-sm text-slate-700">
+                                      公开 Bucket（无需签名访问）
+                                    </label>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <label className="text-sm font-medium">传输模式</label>
+                                    <select
+                                      value={newStorage.config.transfer_mode || 'auto'}
+                                      onChange={(e) =>
+                                        setNewStorage({
+                                          ...newStorage,
+                                          config: { ...newStorage.config, transfer_mode: e.target.value as TransferMode },
+                                        })
+                                      }
+                                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                                    >
+                                      <option value="auto">自动（根据全局设置）</option>
+                                      <option value="always_proxy">始终代理（通过 Go 服务器）</option>
+                                      <option value="always_direct">始终直链（302 重定向到 CDN/MinIO）</option>
+                                    </select>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </>
                       )}
@@ -697,6 +818,101 @@ export default function Settings() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 传输设置 */}
+        <TabsContent value="transfer" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                图片传输模式设置
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-slate-500 mb-2">
+                    设置图片访问的全局传输模式。启用直链访问后，系统可以通过 302 重定向直接将请求转发到 CDN 或 MinIO，减轻服务器压力。
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    存储级别的设置会覆盖全局设置。仅在 MinIO 存储类型中可用。
+                  </p>
+                </div>
+
+                {loading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">选择传输模式</label>
+                    <div className="grid gap-2">
+                      <button
+                        onClick={() => handleUpdateTransferMode('auto')}
+                        disabled={isUpdatingTransferMode}
+                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left ${
+                          transferMode === 'auto'
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`mt-0.5 ${transferMode === 'auto' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                          {transferMode === 'auto' && <Check className="h-5 w-5" />}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">自动模式</div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            根据存储配置自动决定使用代理还是直链。优先使用存储级别的设置。
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => handleUpdateTransferMode('always_proxy')}
+                        disabled={isUpdatingTransferMode}
+                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left ${
+                          transferMode === 'always_proxy'
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`mt-0.5 ${transferMode === 'always_proxy' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                          {transferMode === 'always_proxy' && <Check className="h-5 w-5" />}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">始终代理</div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            所有图片请求都通过 Go 服务器代理。适用于需要统一访问控制或 CDN 不可用的场景。
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        onClick={() => handleUpdateTransferMode('always_direct')}
+                        disabled={isUpdatingTransferMode}
+                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left ${
+                          transferMode === 'always_direct'
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className={`mt-0.5 ${transferMode === 'always_direct' ? 'text-indigo-600' : 'text-slate-400'}`}>
+                          {transferMode === 'always_direct' && <Check className="h-5 w-5" />}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">始终直链</div>
+                          <p className="text-xs text-slate-500 mt-1">
+                            所有图片都通过 302 重定向到 CDN/MinIO 直接访问。需要正确配置存储的直链设置。
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
