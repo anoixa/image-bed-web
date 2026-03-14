@@ -161,12 +161,16 @@ export const fetchRandomImage = async (
   options?: {
     minWidth?: number;
     minHeight?: number;
+    requireWebp?: boolean;
+    maxFileSize?: number;
   }
 ): Promise<RandomImageResponse['data'] | null> => {
   const params = new URLSearchParams();
   if (format === 'json') params.append('format', 'json');
   if (options?.minWidth) params.append('min_width', String(options.minWidth));
   if (options?.minHeight) params.append('min_height', String(options.minHeight));
+  if (options?.requireWebp) params.append('require_webp', 'true');
+  if (options?.maxFileSize) params.append('max_file_size', String(options.maxFileSize));
 
   const query = params.toString() ? `?${params.toString()}` : '';
 

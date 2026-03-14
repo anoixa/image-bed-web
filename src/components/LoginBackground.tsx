@@ -16,15 +16,19 @@ export default function LoginBackground() {
   const loadImages = useCallback(async () => {
     const urls: string[] = [];
 
-    // 尝试获取多张随机图片
+    // 尝试获取多张随机图片（要求有 WebP 变体，文件大小不超过 10MB）
     for (let i = 0; i < IMAGE_COUNT; i++) {
       const image = await fetchRandomImage('json', {
         minWidth: 1920,
         minHeight: 1080,
+        requireWebp: true,
+        maxFileSize: 10 * 1024 * 1024, // 10MB
       });
 
-      if (image?.url && !urls.includes(image.url)) {
-        urls.push(image.url);
+      // 优先使用 WebP 变体
+      const imageUrl = image?.variant?.url || image?.url;
+      if (imageUrl && !urls.includes(imageUrl)) {
+        urls.push(imageUrl);
       }
     }
 

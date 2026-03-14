@@ -296,16 +296,25 @@ export interface TestConfigResponse {
   message?: string;
 }
 
-// 随机图片响应 - 匹配API文档
+// 随机图片响应
 export interface RandomImageResponse {
   status: string;
   msg: string;
   data: {
+    id: number;
     identifier: string;
     url: string;
     width: number;
     height: number;
+    size: number;
     mime_type: string;
+    is_public: boolean;
+    created_at: string;
+    variant?: {
+      identifier: string;
+      format: string;
+      url: string;
+    };
   };
 }
 
