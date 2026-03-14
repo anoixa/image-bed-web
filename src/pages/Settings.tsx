@@ -475,7 +475,7 @@ export default function Settings() {
                       新建配置
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>新建存储配置</DialogTitle>
                     </DialogHeader>
