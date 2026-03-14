@@ -12,7 +12,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { fetchTokens, createToken, deleteToken } from '@/api/tokens';
-import { fetchVersion, fetchSystemStatus } from '@/api/system';
+import { fetchSystemStatus } from '@/api/system';
 import { fetchAlbums } from '@/api/albums';
 import {
   fetchStorageConfigs,
@@ -27,14 +27,13 @@ import {
   fetchRandomSourceAlbum,
   updateRandomSourceAlbum
 } from '@/api/images';
-import type { Token, SystemInfo, StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig } from '@/types';
+import type { Token, StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Settings() {
   const [tokens, setTokens] = useState<Token[]>([]);
-  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,9 +84,8 @@ export default function Settings() {
     setLoading(true);
     try {
       // 分别处理每个请求，避免一个失败影响其他请求
-      const [tokensResult, versionResult, storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult] = await Promise.allSettled([
+      const [tokensResult, storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult] = await Promise.allSettled([
         fetchTokens(),
-        fetchVersion(),
         fetchStorageConfigs(),
         fetchAlbums(),
         fetchRandomSourceAlbum(),
@@ -102,13 +100,6 @@ export default function Settings() {
       } else {
         console.error('加载 Token 失败:', tokensResult.reason);
         setTokens([]);
-      }
-
-      // 处理系统版本数据
-      if (versionResult.status === 'fulfilled') {
-        setSystemInfo(versionResult.value);
-      } else {
-        console.error('加载系统版本失败:', versionResult.reason);
       }
 
       // 处理存储配置数据
@@ -1121,20 +1112,6 @@ export default function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* 版本信息 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-slate-500">版本</p>
-                  <p className="font-medium">{systemInfo?.version || 'Unknown'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500">Commit</p>
-                  <p className="font-medium font-mono text-sm">
-                    {systemInfo?.commit?.slice(0, 8) || 'Unknown'}
-                  </p>
-                </div>
-              </div>
-
               {/* 系统状态 */}
               {systemStatus && (
                 <>
