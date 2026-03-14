@@ -47,7 +47,7 @@ function getTokenExpiry(): number | null {
   return null;
 }
 
-const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000;
+const TOKEN_REFRESH_THRESHOLD = 10 * 60 * 1000; // 10分钟
 
 async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
   const token = getAccessToken();
