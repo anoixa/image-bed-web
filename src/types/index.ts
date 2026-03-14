@@ -56,7 +56,7 @@ export interface ImageVariant {
   status: 'pending' | 'processing' | 'completed' | 'failed';
 }
 
-// 相册类型 - 匹配后端Swagger定义 (albums.AlbumDTO)
+// 相册类型
 export interface Album {
   id: number;
   name: string;
@@ -69,7 +69,7 @@ export interface Album {
   cover_image?: string;
 }
 
-// 相册详情 - 匹配后端Swagger定义 (albums.AlbumDetailResponse)
+// 相册详情
 export interface AlbumDetail extends Album {
   images: AlbumImage[];
 }
@@ -86,7 +86,7 @@ export interface AlbumImage {
   created_at: number;
 }
 
-// Token 类型 - 匹配后端Swagger定义
+// Token 类型 
 export interface Token {
   id: number;
   is_active: boolean;
@@ -97,12 +97,12 @@ export interface Token {
   created_at: string;
 }
 
-// 创建Token请求 - 匹配后端Swagger定义 (key.req)
+// 创建Token请求
 export interface CreateTokenRequest {
   description?: string;
 }
 
-// 创建Token响应 - 后端返回在 data 中，结构由后端决定
+// 创建Token响应
 export interface CreateTokenResponse {
   token: string;
   hash: string;
@@ -120,14 +120,14 @@ export interface User {
   username: string;
 }
 
-// 上传配置 (后端可能不提供，前端保留)
+// 上传配置
 export interface UploadConfig {
   upload_id: string;
   chunk_size: number;
   total_chunks: number;
 }
 
-// 分片上传状态 (后端可能不提供，前端保留)
+// 分片上传状态
 export interface ChunkedUploadStatus {
   upload_id: string;
   total_chunks: number;
@@ -140,7 +140,7 @@ export interface BatchDeleteResult {
   deleted_count: number;
 }
 
-// 批量上传结果 - 匹配后端实际返回
+// 批量上传结果
 export interface BatchUploadResult {
   message: string;
   total_files: number;
@@ -179,42 +179,43 @@ export interface HealthCheck {
 
 // 系统状态
 export interface SystemStatus {
-  // 数据库状态
-  database: {
-    status: string;
-    message?: string;
-  };
-  // 存储状态
-  storage: {
-    status: string;
-    type: string;
-    message?: string;
-  };
-  // 缓存状态
-  cache: {
-    status: string;
-    message?: string;
-  };
-  // 系统运行时间
-  uptime: string;
-  // 内存使用
-  memory: {
-    used: number;
-    total: number;
-    usage_percent: number;
-  };
-  // Go 运行时信息
+  version: string;
+  commit_hash: string;
   go_version: string;
-  goroutines: number;
-  // 图片统计
-  images: {
-    total: number;
-    public: number;
-    private: number;
+  environment: string;
+  cache: {
+    provider: string;
+    type: string;
+  };
+  data_dir: {
+    path: string;
+    file_count: number;
+    total_size: number;
+    size_str: string;
+  };
+  memory: {
+    heap_alloc_mb: number;
+    heap_alloc_str: string;
+    heap_sys_mb: number;
+    heap_sys_str: string;
+    heap_in_use_mb: number;
+    heap_in_use_str: string;
+    gc_sys_mb: number;
+    gc_sys_str: string;
+    stack_sys_mb: number;
+    stack_sys_str: string;
+    total_alloc_mb: number;
+    total_alloc_str: string;
+    last_gc_time: number;
+    num_gc: number;
+    goroutines: number;
+  };
+  runtime: {
+    num_cpu: number;
   };
 }
 
-// Dashboard 统计数据 - 实际后端返回的嵌套结构
+// Dashboard 统计数据
 export interface DashboardStats {
   overview: {
     images: {
@@ -253,10 +254,10 @@ export interface StorageStat {
   percentage: number;
 }
 
-// 配置分类 - 匹配后端Swagger定义
+// 配置分类
 export type ConfigCategory = 'storage' | 'jwt' | 'system' | 'image_processing' | 'security';
 
-// 存储配置 - 匹配后端Swagger定义
+// 存储配置
 export interface StorageConfig {
   id: number;
   name: string;
@@ -273,7 +274,7 @@ export interface StorageConfig {
   created_by?: number;
 }
 
-// 创建存储配置请求 - 匹配后端Swagger定义 (models.SystemConfigStoreRequest)
+// 创建存储配置请求
 export interface CreateStorageConfigRequest {
   name: string;
   category: ConfigCategory;
@@ -318,7 +319,7 @@ export interface RandomImageResponse {
   };
 }
 
-// 随机图源相册配置 - 匹配API文档
+// 随机图源相册配置
 export interface RandomSourceAlbumConfig {
   album_id: number | null;
   include_all_public?: boolean;

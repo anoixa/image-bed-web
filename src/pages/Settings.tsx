@@ -922,33 +922,25 @@ export default function Settings() {
               {/* 系统状态 */}
               {systemStatus && (
                 <>
+                  {/* 运行环境 */}
                   <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">运行状态</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">运行环境</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-slate-500">数据库</p>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${systemStatus.database.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <span className="font-medium text-sm">{systemStatus.database.status === 'ok' ? '正常' : '异常'}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-500">存储</p>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${systemStatus.storage.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <span className="font-medium text-sm">{systemStatus.storage.status === 'ok' ? '正常' : '异常'}</span>
-                        </div>
+                        <p className="text-sm text-slate-500">环境</p>
+                        <p className="font-medium text-sm">{systemStatus.environment}</p>
                       </div>
                       <div>
                         <p className="text-sm text-slate-500">缓存</p>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${systemStatus.cache.status === 'ok' ? 'bg-green-500' : 'bg-red-500'}`} />
-                          <span className="font-medium text-sm">{systemStatus.cache.status === 'ok' ? '正常' : '异常'}</span>
-                        </div>
+                        <p className="font-medium text-sm">{systemStatus.cache.provider}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">运行时间</p>
-                        <p className="font-medium text-sm">{systemStatus.uptime}</p>
+                        <p className="text-sm text-slate-500">CPU 核心</p>
+                        <p className="font-medium text-sm">{systemStatus.runtime.num_cpu}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">Goroutines</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.goroutines}</p>
                       </div>
                     </div>
                   </div>
@@ -956,50 +948,64 @@ export default function Settings() {
                   {/* 内存使用 */}
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-medium text-slate-700 mb-3">内存使用</h4>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">{systemStatus.memory.used} MB / {systemStatus.memory.total} MB</span>
-                        <span className="font-medium">{systemStatus.memory.usage_percent.toFixed(1)}%</span>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-500">堆内存分配</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.heap_alloc_str}</p>
                       </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${systemStatus.memory.usage_percent > 80 ? 'bg-red-500' : systemStatus.memory.usage_percent > 60 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                          style={{ width: `${systemStatus.memory.usage_percent}%` }}
-                        />
+                      <div>
+                        <p className="text-sm text-slate-500">堆系统内存</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.heap_sys_str}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">堆使用内存</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.heap_in_use_str}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">GC 系统内存</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.gc_sys_str}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">栈内存</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.stack_sys_str}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">GC 次数</p>
+                        <p className="font-medium text-sm">{systemStatus.memory.num_gc}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* 运行时信息 */}
+                  {/* 数据目录 */}
                   <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">运行时信息</h4>
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">数据目录</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-slate-500">路径</p>
+                        <p className="font-medium text-sm font-mono">{systemStatus.data_dir.path}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">文件数</p>
+                        <p className="font-medium text-sm">{systemStatus.data_dir.file_count}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-slate-500">总大小</p>
+                        <p className="font-medium text-sm">{systemStatus.data_dir.size_str}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Go 运行时 */}
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Go 运行时</h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-slate-500">Go 版本</p>
                         <p className="font-medium text-sm font-mono">{systemStatus.go_version}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">Goroutines</p>
-                        <p className="font-medium text-sm">{systemStatus.goroutines}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 图片统计 */}
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">图片统计</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="bg-slate-50 rounded-lg p-3 text-center">
-                        <p className="text-2xl font-bold text-slate-800">{systemStatus.images.total}</p>
-                        <p className="text-xs text-slate-500">总图片数</p>
-                      </div>
-                      <div className="bg-slate-50 rounded-lg p-3 text-center">
-                        <p className="text-2xl font-bold text-green-600">{systemStatus.images.public}</p>
-                        <p className="text-xs text-slate-500">公开</p>
-                      </div>
-                      <div className="bg-slate-50 rounded-lg p-3 text-center">
-                        <p className="text-2xl font-bold text-slate-600">{systemStatus.images.private}</p>
-                        <p className="text-xs text-slate-500">私有</p>
+                        <p className="text-sm text-slate-500">Commit</p>
+                        <p className="font-medium text-sm font-mono">{systemStatus.commit_hash || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
