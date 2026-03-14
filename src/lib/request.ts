@@ -155,14 +155,18 @@ request.interceptors.request.use(
   }
 );
 
+// 排除不需要刷新token的接口
+const EXCLUDE_FROM_REFRESH = ['/api/auth/login', '/api/auth/refresh'];
+
 request.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     return response;
   },
   async (error: AxiosError<ApiResponse>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const isExcluded = EXCLUDE_FROM_REFRESH.some(url => originalRequest?.url?.includes(url));
     
-    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry) {
+    if (!originalRequest || error.response?.status !== 401 || originalRequest._retry || isExcluded) {
       return Promise.reject(error);
     }
     
