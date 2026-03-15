@@ -105,6 +105,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       const params: Parameters<typeof fetchImages>[0] = {
         page,
         limit: 20,
+        sort: sortOrder,
       };
 
       if (albumFilter !== 'all') {
@@ -186,6 +187,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       loadImages(1, false);
     }
   }, [searchQuery, loadImages]);
+
+  // 监听筛选条件变化，重新加载
+  useEffect(() => {
+    if (hasInitialized.current) {
+      loadImages(1, false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [albumFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(

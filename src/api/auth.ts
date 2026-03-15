@@ -15,3 +15,8 @@ export const refreshToken = (): Promise<LoginResponse> => {
 export const logout = (): Promise<void> => {
   return post('/api/auth/logout');
 };
+
+// 修改密码
+export const changePassword = (oldPassword: string, newPassword: string): Promise<void> => {
+  return post('/api/v1/user/password', { old_password: oldPassword, new_password: newPassword });
+};

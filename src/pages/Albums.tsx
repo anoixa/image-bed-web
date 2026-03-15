@@ -268,11 +268,11 @@ export default function Albums() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="flex flex-col h-full">
                     {/* 相册卡片内容 - 可点击跳转 */}
-                    <Link 
+                    <Link
                       to={`/?album_id=${album.id}`}
-                      className="block cursor-pointer group"
+                      className="block cursor-pointer group flex-1"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
@@ -299,7 +299,7 @@ export default function Albums() {
                     </Link>
 
                     {/* 操作按钮 */}
-                    <div className="flex justify-end gap-1 pt-2 border-t border-slate-100">
+                    <div className="flex justify-end gap-1 pt-3 mt-3 border-t border-slate-100">
                       <Button
                         variant="ghost"
                         size="sm"

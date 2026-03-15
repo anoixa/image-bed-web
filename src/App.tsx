@@ -6,6 +6,7 @@ import DashboardLayout from '@/layouts/DashboardLayout';
 import Home from '@/pages/Home';
 import Dashboard from '@/pages/Dashboard';
 import Albums from '@/pages/Albums';
+import Tokens from '@/pages/Tokens';
 import Settings from '@/pages/Settings';
 import { Toaster } from '@/components/ui/toaster';
 import HttpsWarning from '@/components/HttpsWarning';
@@ -74,6 +75,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="stats" element={<Dashboard />} />
           <Route path="albums" element={<Albums />} />
+          <Route path="tokens" element={<Tokens />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

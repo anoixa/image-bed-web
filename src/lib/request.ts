@@ -30,10 +30,24 @@ const refreshTokenApi = (): Promise<LoginResponse> => {
   });
 };
 
-// 刷新 token 的状态管理
-let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
+// ============================================
+// Token 刷新状态管理 - 防止并发重复刷新
+// ============================================
 
+// 当前正在进行的刷新 Promise（全局唯一）
+let currentRefreshPromise: Promise<string> | null = null;
+
+// 等待刷新的请求队列
+let refreshSubscribers: Array<{
+  resolve: (token: string) => void;
+  reject: (error: Error) => void;
+}> = [];
+
+const TOKEN_REFRESH_THRESHOLD = 10 * 60 * 1000; // 10分钟
+
+/**
+ * 获取存储的 token 过期时间
+ */
 function getTokenExpiry(): number | null {
   const storageData = localStorage.getItem('auth-storage');
   if (storageData) {
@@ -47,59 +61,9 @@ function getTokenExpiry(): number | null {
   return null;
 }
 
-const TOKEN_REFRESH_THRESHOLD = 10 * 60 * 1000; // 10分钟
-
-async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
-  const token = getAccessToken();
-  const expiry = getTokenExpiry();
-  
-  if (!token || !expiry) {
-    return token;
-  }
-  
-  const now = Date.now();
-  const timeUntilExpiry = expiry - now;
-  
-  if (timeUntilExpiry > TOKEN_REFRESH_THRESHOLD) {
-    return token;
-  }
-  
-  if (isRefreshing) {
-    return new Promise((resolve) => {
-      addRefreshSubscriber((newToken: string) => {
-        resolve(newToken);
-      });
-    });
-  }
-  
-  isRefreshing = true;
-  
-  try {
-    const response = await refreshTokenApi();
-    const newToken = response.access_token.replace('Bearer ', '');
-    const newExpiry = response.access_token_expiry * 1000;
-    
-    setAccessToken(newToken, newExpiry);
-    onTokenRefreshed(newToken);
-    
-    return newToken;
-  } catch (error) {
-    clearAuthState();
-    return null;
-  } finally {
-    isRefreshing = false;
-  }
-}
-
-function onTokenRefreshed(token: string) {
-  refreshSubscribers.forEach((callback) => callback(token));
-  refreshSubscribers = [];
-}
-
-function addRefreshSubscriber(callback: (token: string) => void) {
-  refreshSubscribers.push(callback);
-}
-
+/**
+ * 获取存储的 access token
+ */
 function getAccessToken(): string | null {
   const storageData = localStorage.getItem('auth-storage');
   if (storageData) {
@@ -113,6 +77,9 @@ function getAccessToken(): string | null {
   return null;
 }
 
+/**
+ * 设置新的 access token 到存储
+ */
 function setAccessToken(token: string, expiry: number) {
   const storageData = localStorage.getItem('auth-storage');
   if (storageData) {
@@ -122,23 +89,123 @@ function setAccessToken(token: string, expiry: number) {
       parsed.state.accessTokenExpiry = expiry;
       localStorage.setItem('auth-storage', JSON.stringify(parsed));
     } catch {
+      // 解析失败时静默处理
     }
   }
 }
 
+/**
+ * 清除认证状态并跳转登录页
+ */
 function clearAuthState() {
   localStorage.removeItem('auth-storage');
   window.location.href = '/login';
 }
 
+/**
+ * 执行实际的 Token 刷新
+ * 这是唯一会调用后端刷新接口的地方
+ */
+async function performTokenRefresh(): Promise<string> {
+  try {
+    const response = await refreshTokenApi();
+    const newToken = response.access_token.replace('Bearer ', '');
+    const newExpiry = response.access_token_expiry * 1000;
+
+    setAccessToken(newToken, newExpiry);
+
+    // 通知所有等待的请求
+    refreshSubscribers.forEach(({ resolve }) => resolve(newToken));
+    refreshSubscribers = [];
+
+    return newToken;
+  } catch (error) {
+    // 刷新失败，拒绝所有等待的请求
+    refreshSubscribers.forEach(({ reject }) =>
+      reject(error instanceof Error ? error : new Error('Token 刷新失败'))
+    );
+    refreshSubscribers = [];
+
+    clearAuthState();
+    throw error;
+  } finally {
+    currentRefreshPromise = null;
+  }
+}
+
+/**
+ * 获取刷新 Promise（如果不存在则创建）
+ * 这是防止并发刷新的核心机制
+ */
+function getOrCreateRefreshPromise(): Promise<string> {
+  if (!currentRefreshPromise) {
+    currentRefreshPromise = performTokenRefresh();
+  }
+  return currentRefreshPromise;
+}
+
+/**
+ * 添加一个刷新订阅者，等待刷新完成
+ */
+function waitForRefresh(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    refreshSubscribers.push({ resolve, reject });
+  });
+}
+
+/**
+ * 检查并在需要时刷新 Token
+ * 核心逻辑：
+ 1. 如果 Token 未过期且不在阈值内，直接返回当前 Token
+ 2. 如果正在刷新，等待刷新完成
+ 3. 如果 Token 即将过期或已过期，启动刷新流程
+ */
+async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
+  const token = getAccessToken();
+  const expiry = getTokenExpiry();
+
+  if (!token || !expiry) {
+    return token;
+  }
+
+  const now = Date.now();
+  const timeUntilExpiry = expiry - now;
+
+  // Token 还有效且不在刷新阈值内，直接使用
+  if (timeUntilExpiry > TOKEN_REFRESH_THRESHOLD) {
+    return token;
+  }
+
+  // Token 即将过期或已过期，需要刷新
+  // 关键：如果有正在进行的刷新，等待它完成（而不是启动新的刷新）
+  if (currentRefreshPromise) {
+    try {
+      return await waitForRefresh();
+    } catch {
+      return null;
+    }
+  }
+
+  // 启动新的刷新流程
+  try {
+    return await getOrCreateRefreshPromise();
+  } catch {
+    return null;
+  }
+}
+
+// ============================================
+// 请求拦截器
+// ============================================
+
 request.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = await checkAndRefreshTokenIfNeeded();
-    
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     } else if (!config.headers['Content-Type']) {
@@ -147,7 +214,7 @@ request.interceptors.request.use(
         config.headers['Content-Type'] = 'application/json';
       }
     }
-    
+
     return config;
   },
   (error: AxiosError) => {
@@ -155,8 +222,12 @@ request.interceptors.request.use(
   }
 );
 
+// ============================================
+// 响应拦截器 - 处理 401 和 Token 刷新
+// ============================================
+
 // 排除不需要刷新token的接口
-const EXCLUDE_FROM_REFRESH = ['/api/auth/login', '/api/auth/refresh'];
+const EXCLUDE_FROM_REFRESH = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
 
 request.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
@@ -165,44 +236,41 @@ request.interceptors.response.use(
   async (error: AxiosError<ApiResponse>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const isExcluded = EXCLUDE_FROM_REFRESH.some(url => originalRequest?.url?.includes(url));
-    
+
+    // 不满足刷新条件时直接抛出错误
     if (!originalRequest || error.response?.status !== 401 || originalRequest._retry || isExcluded) {
       return Promise.reject(error);
     }
-    
+
+    // 标记已重试，防止无限循环
     originalRequest._retry = true;
-    
-    if (isRefreshing) {
-      return new Promise((resolve) => {
-        addRefreshSubscriber((token: string) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          resolve(request(originalRequest));
-        });
-      });
+
+    // 关键：如果有正在进行的刷新，等待它完成
+    if (currentRefreshPromise) {
+      try {
+        const newToken = await waitForRefresh();
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return request(originalRequest);
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
     }
-    
-    isRefreshing = true;
-    
+
+    // 启动新的刷新流程
     try {
-      const response = await refreshTokenApi();
-      
-      const newToken = response.access_token.replace('Bearer ', '');
-      const newExpiry = response.access_token_expiry * 1000;
-      
-      setAccessToken(newToken, newExpiry);
-      onTokenRefreshed(newToken);
-      
+      const newToken = await getOrCreateRefreshPromise();
       originalRequest.headers.Authorization = `Bearer ${newToken}`;
       return request(originalRequest);
     } catch (refreshError) {
-      clearAuthState();
       return Promise.reject(refreshError);
-    } finally {
-      isRefreshing = false;
     }
   }
-  );
-  
+);
+
+// ============================================
+// 导出 HTTP 方法
+// ============================================
+
 export const get = <T>(url: string, config?: AxiosRequestConfig): Promise<T> => {
   return request.get<ApiResponse<T>>(url, config).then((res) => {
     if (res.data.status === 'error') {

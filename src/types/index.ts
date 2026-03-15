@@ -351,5 +351,4 @@ export interface MinIOConfig {
   enable_direct_link?: boolean;
   public_endpoint?: string;
   is_public_bucket?: boolean;
-  transfer_mode?: TransferMode;
 }

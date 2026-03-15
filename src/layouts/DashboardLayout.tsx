@@ -13,7 +13,16 @@ import {
   X,
   Key,
   Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { changePassword } from '@/api/auth';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -38,6 +47,7 @@ const navItems: NavItem[] = [
   { path: '/', label: '全部图片', icon: ImageIcon },
   { path: '/stats', label: '统计大屏', icon: BarChart3 },
   { path: '/albums', label: '相册管理', icon: Folder },
+  { path: '/tokens', label: 'API Token', icon: Key },
   { path: '/settings', label: '系统设置', icon: Settings },
 ];
 
@@ -117,6 +127,15 @@ export default function DashboardLayout() {
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
 
+  // 修改密码弹窗状态
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   const handleLogout = async () => {
     await logout();
     toast({
@@ -124,6 +143,81 @@ export default function DashboardLayout() {
       description: '拜拜~',
     });
     navigate('/login');
+  };
+
+  // 计算密码复杂度
+  const getPasswordStrength = (password: string): { score: number; label: string; color: string } => {
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+    const levels = [
+      { label: '太短', color: 'bg-red-500' },
+      { label: '弱', color: 'bg-orange-500' },
+      { label: '一般', color: 'bg-yellow-500' },
+      { label: '良好', color: 'bg-blue-500' },
+      { label: '强', color: 'bg-green-500' },
+      { label: '非常强', color: 'bg-emerald-500' },
+    ];
+    return { score, ...levels[score] };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
+  const handleChangePassword = async () => {
+    // 验证
+    if (!oldPassword) {
+      toast({ title: '请输入当前密码', variant: 'destructive' });
+      return;
+    }
+    if (!newPassword) {
+      toast({ title: '请输入新密码', variant: 'destructive' });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: '新密码最少6位', variant: 'destructive' });
+      return;
+    }
+    if (passwordStrength.score < 3) {
+      toast({ title: '密码强度不足', description: '请使用包含大小写字母、数字和特殊字符的密码', variant: 'destructive' });
+      return;
+    }
+    if (newPassword === oldPassword) {
+      toast({ title: '新密码不能与旧密码相同', variant: 'destructive' });
+      return;
+    }
+    if (!confirmPassword) {
+      toast({ title: '请确认新密码', variant: 'destructive' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast({ title: '两次输入的新密码不一致', variant: 'destructive' });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      await changePassword(oldPassword, newPassword);
+      toast({ title: '密码修改成功', description: '请使用新密码重新登录' });
+      setIsPasswordDialogOpen(false);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      // 修改成功后退出登录
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      toast({
+        title: '修改失败',
+        description: error instanceof Error ? error.message : '请检查当前密码是否正确',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   // 同步 URL 参数到本地状态
@@ -256,7 +350,7 @@ export default function DashboardLayout() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem
-                    onClick={() => toast({ title: '敬请期待', description: '修改密码功能即将上线' })}
+                    onClick={() => setIsPasswordDialogOpen(true)}
                     className="cursor-pointer"
                   >
                     <Key className="mr-2 h-4 w-4" />
@@ -290,6 +384,121 @@ export default function DashboardLayout() {
         onOpenChange={handleUploadOpenChange}
         onSuccess={handleUploadSuccess}
       />
+
+      {/* 修改密码弹窗 */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              修改密码
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">当前密码</label>
+              <div className="relative">
+                <Input
+                  type={showOldPassword ? 'text' : 'password'}
+                  value={oldPassword}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  placeholder="请输入当前密码"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOldPassword(!showOldPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showOldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">新密码</label>
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="最少6位"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {/* 密码强度指示器 */}
+              {newPassword && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">密码强度</span>
+                    <span className={`text-xs font-medium ${
+                      passwordStrength.score >= 3 ? 'text-green-600' :
+                      passwordStrength.score >= 2 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {passwordStrength.label}
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <div
+                        key={level}
+                        className={`h-1.5 flex-1 rounded-full transition-all ${
+                          level <= passwordStrength.score ? passwordStrength.color : 'bg-slate-200'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <ul className="text-xs text-slate-500 space-y-1">
+                    <li className={newPassword.length >= 6 ? 'text-green-600' : ''}>• 至少6个字符</li>
+                    <li className={/[a-z]/.test(newPassword) && /[A-Z]/.test(newPassword) ? 'text-green-600' : ''}>• 包含大小写字母</li>
+                    <li className={/[0-9]/.test(newPassword) ? 'text-green-600' : ''}>• 包含数字</li>
+                    <li className={/[^a-zA-Z0-9]/.test(newPassword) ? 'text-green-600' : ''}>• 包含特殊字符</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">确认新密码</label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="再次输入新密码"
+              />
+              {confirmPassword && confirmPassword !== newPassword && (
+                <p className="text-xs text-red-500">两次输入的密码不一致</p>
+              )}
+              {confirmPassword && confirmPassword === newPassword && newPassword.length >= 6 && (
+                <p className="text-xs text-green-600">密码一致</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsPasswordDialogOpen(false);
+                  setOldPassword('');
+                  setNewPassword('');
+                  setConfirmPassword('');
+                }}
+              >
+                取消
+              </Button>
+              <Button
+                onClick={handleChangePassword}
+                disabled={isChangingPassword}
+                className="bg-indigo-600 hover:bg-indigo-700"
+              >
+                {isChangingPassword ? '修改中...' : '确认修改'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

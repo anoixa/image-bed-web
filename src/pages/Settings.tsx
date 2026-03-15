@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Key, Plus, Trash2, Copy, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe } from 'lucide-react';
+import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,12 +11,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { fetchTokens, createToken, deleteToken } from '@/api/tokens';
 import { fetchSystemStatus } from '@/api/system';
 import { fetchAlbums } from '@/api/albums';
 import {
   fetchStorageConfigs,
   createStorageConfig,
+  updateStorageConfig,
   deleteStorageConfig,
   setDefaultStorageConfig,
   testStorageConfig,
@@ -27,20 +27,18 @@ import {
   fetchRandomSourceAlbum,
   updateRandomSourceAlbum
 } from '@/api/images';
-import type { Token, StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig } from '@/types';
+import type { StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Settings() {
-  const [tokens, setTokens] = useState<Token[]>([]);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isCreateTokenOpen, setIsCreateTokenOpen] = useState(false);
   const [isCreateStorageOpen, setIsCreateStorageOpen] = useState(false);
-  const [newTokenName, setNewTokenName] = useState('');
-  const [createdToken, setCreatedToken] = useState<{ token: string; hash: string } | null>(null);
+  const [isEditStorageOpen, setIsEditStorageOpen] = useState(false);
+  const [editingStorageId, setEditingStorageId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState('storage');
 
   // 确认弹窗状态
@@ -84,23 +82,13 @@ export default function Settings() {
     setLoading(true);
     try {
       // 分别处理每个请求，避免一个失败影响其他请求
-      const [tokensResult, storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult] = await Promise.allSettled([
-        fetchTokens(),
+      const [storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult] = await Promise.allSettled([
         fetchStorageConfigs(),
         fetchAlbums(),
         fetchRandomSourceAlbum(),
         fetchSystemStatus(),
         fetchTransferMode(),
       ]);
-
-      // 处理 Token 数据
-      if (tokensResult.status === 'fulfilled') {
-        const tokenData = tokensResult.value;
-        setTokens(Array.isArray(tokenData) ? tokenData : []);
-      } else {
-        console.error('加载 Token 失败:', tokensResult.reason);
-        setTokens([]);
-      }
 
       // 处理存储配置数据
       if (storageResult.status === 'fulfilled') {
@@ -166,132 +154,6 @@ export default function Settings() {
     loadData();
   }, [loadData]);
 
-  // Token 管理
-  const handleCreateToken = async () => {
-    if (!newTokenName.trim()) {
-      toast({
-        title: '请输入Token名称',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      const token = await createToken(newTokenName);
-      setCreatedToken(token);
-      setNewTokenName('');
-      setActiveTab('tokens');  // 创建成功后自动切换到 tokens 选项卡
-      loadData();
-    } catch (error) {
-      toast({
-        title: '创建失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDeleteToken = async (id: number) => {
-    setConfirmDialog({
-      open: true,
-      title: '删除 Token',
-      description: '确定要删除这个 Token 吗？删除后将无法恢复。',
-      variant: 'destructive',
-      onConfirm: async () => {
-        try {
-          await deleteToken(id);
-          toast({
-            title: '删除成功',
-            description: 'Token 已删除',
-          });
-          loadData();
-        } catch (error) {
-          toast({
-            title: '删除失败',
-            description: error instanceof Error ? error.message : '请稍后重试',
-            variant: 'destructive',
-          });
-        }
-      },
-    });
-  };
-
-  const handleCopyToken = async (token: string) => {
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(token);
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = token;
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-999999px';
-        textarea.style.top = '0';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        const success = document.execCommand('copy');
-        document.body.removeChild(textarea);
-        if (!success) {
-          throw new Error('execCommand copy failed');
-        }
-      }
-      toast({
-        title: '复制成功',
-        description: 'Token已复制到剪贴板',
-      });
-    } catch {
-      toast({
-        title: '复制失败',
-        description: '请手动复制',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // 更新随机图源相册
-  const handleUpdateRandomSourceAlbum = async (albumId: number | null) => {
-    setIsUpdatingRandomSource(true);
-    try {
-      await updateRandomSourceAlbum(albumId ?? 0);
-      setRandomSourceAlbum(albumId);
-      toast({
-        title: '设置成功',
-        description: albumId
-          ? `已将 "${albums.find(a => a.id === albumId)?.name}" 设为登录页背景图源`
-          : '已取消登录页背景图源设置（将使用所有公开图片）',
-      });
-    } catch (error) {
-      toast({
-        title: '设置失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpdatingRandomSource(false);
-    }
-  };
-
-  // 更新 Transfer Mode
-  const handleUpdateTransferMode = async (mode: TransferMode) => {
-    setIsUpdatingTransferMode(true);
-    try {
-      const result = await updateTransferMode({ mode });
-      setTransferMode(result.mode);
-      toast({
-        title: '设置成功',
-        description: `全局传输模式已更新为：${mode === 'auto' ? '自动' : mode === 'always_proxy' ? '始终代理' : '始终直链'}`,
-      });
-    } catch (error) {
-      toast({
-        title: '设置失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpdatingTransferMode(false);
-    }
-  };
-
   // 存储配置管理
   const handleCreateStorage = async () => {
     if (!newStorage.name.trim()) {
@@ -300,6 +162,26 @@ export default function Settings() {
         variant: 'destructive',
       });
       return;
+    }
+
+    // 根据存储类型验证必填字段
+    if (newStorage.config.type === 'local' && !newStorage.config.path) {
+      toast({
+        title: '请输入存储路径',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newStorage.config.type === 'minio') {
+      if (!newStorage.config.endpoint || !newStorage.config.bucket_name ||
+          !newStorage.config.access_key_id || !newStorage.config.secret_access_key) {
+        toast({
+          title: '请填写完整的 MinIO 配置',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     try {
@@ -313,11 +195,7 @@ export default function Settings() {
         title: '创建成功',
         description: '存储配置已创建',
       });
-      setNewStorage({
-        name: '',
-        config: { type: 'local' },
-        is_default: false,
-      });
+      setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
       setIsCreateStorageOpen(false);
       loadData();
     } catch (error) {
@@ -354,7 +232,7 @@ export default function Settings() {
     });
   };
 
-  const handleSetDefaultStorage = async (id: number) => {
+  const handleSetDefault = async (id: number) => {
     try {
       await setDefaultStorageConfig(id);
       toast({
@@ -376,13 +254,13 @@ export default function Settings() {
       const result = await testStorageConfig(id);
       if (result.success) {
         toast({
-          title: '连接测试成功',
-          description: result.message,
+          title: '测试成功',
+          description: '存储配置连接正常',
         });
       } else {
         toast({
-          title: '连接测试失败',
-          description: result.message,
+          title: '测试失败',
+          description: result.message || '无法连接到存储',
           variant: 'destructive',
         });
       }
@@ -395,21 +273,127 @@ export default function Settings() {
     }
   };
 
+  // 打开编辑弹窗
+  const handleOpenEditStorage = (config: StorageConfig) => {
+    setEditingStorageId(config.id);
+    const configType = (config.config as Record<string, string>)?.type || 'local';
+    setNewStorage({
+      name: config.name,
+      config: {
+        ...(config.config as Record<string, string>),
+        type: configType as 'local' | 'minio' | 'webdav'
+      },
+      is_default: config.is_default,
+    });
+    setIsEditStorageOpen(true);
+  };
+
+  // 更新存储配置
+  const handleUpdateStorage = async () => {
+    if (!editingStorageId) return;
+    if (!newStorage.name.trim()) {
+      toast({
+        title: '请输入配置名称',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await updateStorageConfig(editingStorageId, {
+        name: newStorage.name,
+        category: 'storage',
+        config: newStorage.config,
+      });
+      toast({
+        title: '更新成功',
+        description: '存储配置已更新',
+      });
+      setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
+      setIsEditStorageOpen(false);
+      setEditingStorageId(null);
+      loadData();
+    } catch (error) {
+      toast({
+        title: '更新失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Transfer Mode 管理
+  const handleUpdateTransferMode = async (mode: TransferMode) => {
+    setIsUpdatingTransferMode(true);
+    try {
+      await updateTransferMode({ mode });
+      setTransferMode(mode);
+      toast({
+        title: '更新成功',
+        description: '传输模式已更新',
+      });
+    } catch (error) {
+      toast({
+        title: '更新失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingTransferMode(false);
+    }
+  };
+
+  // 随机图源相册管理
+  const handleUpdateRandomSourceAlbum = async (albumId: number | null) => {
+    setIsUpdatingRandomSource(true);
+    try {
+      await updateRandomSourceAlbum(albumId);
+      setRandomSourceAlbum(albumId);
+      toast({
+        title: '更新成功',
+        description: '随机图源已更新',
+      });
+    } catch (error) {
+      toast({
+        title: '更新失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingRandomSource(false);
+    }
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'local':
-        return <HardDrive className="h-5 w-5" />;
-      case 'minio':
+      case 'storage':
         return <Database className="h-5 w-5" />;
-      case 'webdav':
+      case 'jwt':
         return <Server className="h-5 w-5" />;
       default:
-        return <Database className="h-5 w-5" />;
+        return <Settings2 className="h-5 w-5" />;
     }
   };
 
   const getCategoryName = (category: string) => {
     switch (category) {
+      case 'storage':
+        return '存储';
+      case 'jwt':
+        return 'JWT';
+      case 'system':
+        return '系统';
+      case 'image_processing':
+        return '图片处理';
+      case 'security':
+        return '安全';
+      default:
+        return category;
+    }
+  };
+
+  const getStorageTypeName = (type: string) => {
+    switch (type) {
       case 'local':
         return '本地存储';
       case 'minio':
@@ -417,36 +401,42 @@ export default function Settings() {
       case 'webdav':
         return 'WebDAV';
       default:
-        return category;
+        return type;
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('zh-CN');
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-800">系统设置</h1>
-        <p className="text-slate-500 mt-1">管理 API Token 和存储配置</p>
+        <p className="text-slate-500 mt-1">管理存储配置和系统参数</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="storage">存储配置</TabsTrigger>
           <TabsTrigger value="transfer">传输设置</TabsTrigger>
           <TabsTrigger value="background">登录背景</TabsTrigger>
-          <TabsTrigger value="tokens">API Token</TabsTrigger>
           <TabsTrigger value="system">系统信息</TabsTrigger>
         </TabsList>
 
@@ -606,61 +596,39 @@ export default function Settings() {
                                 </label>
                               </div>
 
-                              {newStorage.config.enable_direct_link === 'true' && (
-                                <>
-                                  <div className="space-y-2">
-                                    <label className="text-sm font-medium">Public Endpoint (CDN URL)</label>
-                                    <Input
-                                      placeholder="https://cdn.example.com"
-                                      onChange={(e) =>
-                                        setNewStorage({
-                                          ...newStorage,
-                                          config: { ...newStorage.config, public_endpoint: e.target.value },
-                                        })
-                                      }
-                                    />
-                                    <p className="text-xs text-slate-500">
-                                      可选，用于 CDN 加速，留空则使用 MinIO Endpoint
-                                    </p>
-                                  </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium">Public Endpoint</label>
+                                <Input
+                                  placeholder="https://cdn.example.com"
+                                  onChange={(e) =>
+                                    setNewStorage({
+                                      ...newStorage,
+                                      config: { ...newStorage.config, public_endpoint: e.target.value },
+                                    })
+                                  }
+                                />
+                                <p className="text-xs text-slate-500">
+                                  用户访问图片时使用的 CDN 域名或 MinIO 外部地址
+                                </p>
+                              </div>
 
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      id="minio-public-bucket"
-                                      checked={newStorage.config.is_public_bucket === 'true'}
-                                      onChange={(e) =>
-                                        setNewStorage({
-                                          ...newStorage,
-                                          config: { ...newStorage.config, is_public_bucket: String(e.target.checked) },
-                                        })
-                                      }
-                                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                    />
-                                    <label htmlFor="minio-public-bucket" className="text-sm text-slate-700">
-                                      公开 Bucket（无需签名访问）
-                                    </label>
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <label className="text-sm font-medium">传输模式</label>
-                                    <select
-                                      value={newStorage.config.transfer_mode || 'auto'}
-                                      onChange={(e) =>
-                                        setNewStorage({
-                                          ...newStorage,
-                                          config: { ...newStorage.config, transfer_mode: e.target.value as TransferMode },
-                                        })
-                                      }
-                                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                                    >
-                                      <option value="auto">自动（根据全局设置）</option>
-                                      <option value="always_proxy">始终代理（通过 Go 服务器）</option>
-                                      <option value="always_direct">始终直链（302 重定向到 CDN/MinIO）</option>
-                                    </select>
-                                  </div>
-                                </>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id="minio-public-bucket"
+                                  checked={newStorage.config.is_public_bucket === 'true'}
+                                  onChange={(e) =>
+                                    setNewStorage({
+                                      ...newStorage,
+                                      config: { ...newStorage.config, is_public_bucket: String(e.target.checked) },
+                                    })
+                                  }
+                                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <label htmlFor="minio-public-bucket" className="text-sm text-slate-700">
+                                  公开 Bucket（无需签名访问）
+                                </label>
+                              </div>
                             </div>
                           </div>
                         </>
@@ -773,6 +741,14 @@ export default function Settings() {
                           <p className="text-sm text-slate-500">
                             {getCategoryName(config.category)} · {formatDate(config.created_at)}
                           </p>
+                          {Boolean(config.config && (config.config as Record<string, unknown>).type) && (
+                            <p className="text-xs text-slate-400">
+                              类型: {getStorageTypeName(String((config.config as Record<string, unknown>).type))}
+                              {(config.config as Record<string, unknown>).path ? ` · 路径: ${String((config.config as Record<string, unknown>).path)}` : ''}
+                              {(config.config as Record<string, unknown>).endpoint ? ` · Endpoint: ${String((config.config as Record<string, unknown>).endpoint)}` : ''}
+                              {(config.config as Record<string, unknown>).bucket_name ? ` · Bucket: ${String((config.config as Record<string, unknown>).bucket_name)}` : ''}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -780,30 +756,33 @@ export default function Settings() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleSetDefaultStorage(config.id)}
-                            title="设为默认"
+                            onClick={() => handleSetDefault(config.id)}
                           >
-                            <Check className="h-4 w-4" />
+                            设为默认
                           </Button>
                         )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleTestStorage(config.id)}
-                          title="测试连接"
+                          onClick={() => handleOpenEditStorage(config)}
                         >
-                          <Settings2 className="h-4 w-4" />
+                          编辑
                         </Button>
-                        {!config.is_default && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => handleDeleteStorage(config.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleTestStorage(config.id)}
+                        >
+                          测试
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleDeleteStorage(config.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -819,139 +798,129 @@ export default function Settings() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="h-5 w-5" />
-                图片传输模式设置
+                传输模式设置
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-slate-500 mb-2">
-                    设置图片访问的全局传输模式。启用直链访问后，系统可以通过 302 重定向直接将请求转发到 CDN 或 MinIO，减轻服务器压力。
-                  </p>
-                  <p className="text-sm text-slate-400">
-                    存储级别的设置会覆盖全局设置。仅在 MinIO 存储类型中可用。
-                  </p>
-                </div>
-
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="text-sm font-medium">选择传输模式</label>
-                    <div className="grid gap-2">
-                      <button
-                        onClick={() => handleUpdateTransferMode('auto')}
-                        disabled={isUpdatingTransferMode}
-                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left ${
-                          transferMode === 'auto'
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className={`mt-0.5 ${transferMode === 'auto' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                          {transferMode === 'auto' && <Check className="h-5 w-5" />}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">自动模式</div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            根据存储配置自动决定使用代理还是直链。优先使用存储级别的设置。
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => handleUpdateTransferMode('always_proxy')}
-                        disabled={isUpdatingTransferMode}
-                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left ${
-                          transferMode === 'always_proxy'
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className={`mt-0.5 ${transferMode === 'always_proxy' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                          {transferMode === 'always_proxy' && <Check className="h-5 w-5" />}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">始终代理</div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            所有图片请求都通过 Go 服务器代理。适用于需要统一访问控制或 CDN 不可用的场景。
-                          </p>
-                        </div>
-                      </button>
-
-                      <button
-                        onClick={() => handleUpdateTransferMode('always_direct')}
-                        disabled={isUpdatingTransferMode}
-                        className={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left ${
-                          transferMode === 'always_direct'
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className={`mt-0.5 ${transferMode === 'always_direct' ? 'text-indigo-600' : 'text-slate-400'}`}>
-                          {transferMode === 'always_direct' && <Check className="h-5 w-5" />}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium text-sm">始终直链</div>
-                          <p className="text-xs text-slate-500 mt-1">
-                            所有图片都通过 302 重定向到 CDN/MinIO 直接访问。需要正确配置存储的直链设置。
-                          </p>
-                        </div>
-                      </button>
+                <div
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    transferMode === 'auto'
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                  onClick={() => !isUpdatingTransferMode && handleUpdateTransferMode('auto')}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                      transferMode === 'auto' ? 'border-indigo-500' : 'border-slate-300'
+                    }`}>
+                      {transferMode === 'auto' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-slate-800">自动模式</h4>
+                      <p className="text-sm text-slate-500 mt-1">
+                        根据存储配置自动决定使用代理还是直链。优先使用存储级别的设置。
+                      </p>
                     </div>
                   </div>
-                )}
+                </div>
+
+                <div
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    transferMode === 'always_proxy'
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                  onClick={() => !isUpdatingTransferMode && handleUpdateTransferMode('always_proxy')}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                      transferMode === 'always_proxy' ? 'border-indigo-500' : 'border-slate-300'
+                    }`}>
+                      {transferMode === 'always_proxy' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-slate-800">始终代理</h4>
+                      <p className="text-sm text-slate-500 mt-1">
+                        所有图片都通过 Go 服务器代理访问。兼容性好，但会增加服务器带宽。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    transferMode === 'always_direct'
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-slate-200 hover:border-slate-300'
+                  }`}
+                  onClick={() => !isUpdatingTransferMode && handleUpdateTransferMode('always_direct')}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                      transferMode === 'always_direct' ? 'border-indigo-500' : 'border-slate-300'
+                    }`}>
+                      {transferMode === 'always_direct' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-slate-800">始终直链</h4>
+                      <p className="text-sm text-slate-500 mt-1">
+                        所有图片都通过 302 重定向到 CDN/MinIO 直接访问。需要正确配置存储的直链设置。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-amber-800 mb-2">配置说明</h4>
+                <ul className="text-sm text-amber-700 space-y-1 list-disc list-inside">
+                  <li>自动模式：优先使用存储配置中的直链设置</li>
+                  <li>始终代理：所有请求都经过 Go 服务器，适合内网部署</li>
+                  <li>始终直链：适合有 CDN 或 MinIO 公开访问的场景</li>
+                </ul>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* 登录背景配置 */}
+        {/* 登录背景设置 */}
         <TabsContent value="background" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ImageIcon className="h-5 w-5" />
-                登录页背景设置
+                随机图源相册
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent>
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-slate-500 mb-2">
-                    选择一个相册作为登录页 Ken Burns 背景的图源。系统将从这个相册中随机选择图片展示。
-                  </p>
-                  <p className="text-sm text-slate-400">
-                    如不选择，将从所有公开图片中随机获取。
-                  </p>
-                </div>
+                <p className="text-sm text-slate-500">
+                  设置登录页面随机背景图片的来源相册。选择"所有公开图片"将使用系统中所有公开的图片。
+                </p>
 
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                  </div>
-                ) : albums.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 rounded-lg">
-                    <ImageIcon className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                    <p className="text-slate-500">暂无相册</p>
-                    <p className="text-sm text-slate-400 mt-1">请先创建相册并上传图片</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <label className="text-sm font-medium">选择相册</label>
-                    <div className="grid gap-2">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">选择图源相册</label>
+                  {isUpdatingRandomSource ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      更新中...
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
                       <button
                         onClick={() => handleUpdateRandomSourceAlbum(null)}
-                        disabled={isUpdatingRandomSource}
-                        className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
                           randomSourceAlbum === null
                             ? 'border-indigo-500 bg-indigo-50'
                             : 'border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <span className="text-sm">所有公开图片（默认）</span>
+                        <div className="flex items-center gap-3">
+                          <Globe className="h-5 w-5 text-slate-400" />
+                          <span className="text-sm font-medium">所有公开图片</span>
+                        </div>
                         {randomSourceAlbum === null && (
                           <Check className="h-4 w-4 text-indigo-600" />
                         )}
@@ -961,8 +930,7 @@ export default function Settings() {
                         <button
                           key={album.id}
                           onClick={() => handleUpdateRandomSourceAlbum(album.id)}
-                          disabled={isUpdatingRandomSource}
-                          className={`flex items-center justify-between p-3 rounded-lg border transition-all ${
+                          className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
                             randomSourceAlbum === album.id
                               ? 'border-indigo-500 bg-indigo-50'
                               : 'border-slate-200 hover:border-slate-300'
@@ -980,124 +948,9 @@ export default function Settings() {
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* API Token */}
-        <TabsContent value="tokens" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Key className="h-5 w-5" />
-                  API Token 管理
-                </CardTitle>
-                <Dialog open={isCreateTokenOpen} onOpenChange={setIsCreateTokenOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-indigo-600 hover:bg-indigo-700">
-                      <Plus className="mr-2 h-4 w-4" />
-                      新建 Token
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>新建 API Token</DialogTitle>
-                    </DialogHeader>
-                    {createdToken ? (
-                      <div className="space-y-4 pt-4">
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                          <p className="text-sm text-amber-800 font-medium mb-2">
-                            请立即复制保存，此 Token 只显示一次！
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <code className="flex-1 bg-slate-900 text-slate-100 px-3 py-2 rounded text-sm font-mono break-all">
-                              {createdToken.token}
-                            </code>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => createdToken.token && handleCopyToken(createdToken.token)}
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={() => {
-                            setCreatedToken(null);
-                            setIsCreateTokenOpen(false);
-                          }}
-                          className="w-full"
-                        >
-                          完成
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Token 名称</label>
-                          <Input
-                            value={newTokenName}
-                            onChange={(e) => setNewTokenName(e.target.value)}
-                            placeholder="例如：手机应用、第三方工具"
-                          />
-                        </div>
-                        <div className="flex justify-end gap-3 pt-4">
-                          <Button variant="outline" onClick={() => setIsCreateTokenOpen(false)}>
-                            取消
-                          </Button>
-                          <Button onClick={handleCreateToken} className="bg-indigo-600 hover:bg-indigo-700">
-                            创建
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!tokens || tokens.length === 0 ? (
-                <div className="text-center py-10">
-                  <Key className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">暂无 API Token</p>
-                  <p className="text-sm text-slate-400 mt-1">创建 Token 用于第三方应用访问</p>
+                  )}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {tokens.map((token) => (
-                    <div
-                      key={token.id}
-                      className="flex items-center justify-between p-4 bg-slate-50 rounded-lg"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{token.description || token.prefix}</span>
-                          <Badge variant={token.is_active ? 'default' : 'secondary'}>
-                            {token.is_active ? '有效' : '已失效'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-slate-500 mt-1">
-                          Token: {token.prefix}*** · 创建于 {formatDate(token.created_at)}
-                          {token.last_used_at && ` · 最后使用 ${formatDate(token.last_used_at)}`}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => handleDeleteToken(token.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1218,6 +1071,202 @@ export default function Settings() {
         onConfirm={confirmDialog.onConfirm}
         variant={confirmDialog.variant}
       />
+
+      {/* 编辑存储配置弹窗 */}
+      <Dialog open={isEditStorageOpen} onOpenChange={setIsEditStorageOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>编辑存储配置</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">配置名称</label>
+              <Input
+                value={newStorage.name}
+                onChange={(e) => setNewStorage({ ...newStorage, name: e.target.value })}
+                placeholder="例如：本地存储、MinIO主库"
+              />
+            </div>
+
+            {/* 存储类型 - 只读显示 */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-500">存储类型（不可修改）</label>
+              <Input
+                value={getStorageTypeName(newStorage.config.type)}
+                disabled
+                className="bg-slate-100 text-slate-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-slate-400">存储类型创建后无法修改，如需更换请删除后重新创建</p>
+            </div>
+
+            {/* 根据类型显示只读的基础配置 */}
+            {newStorage.config.type === 'local' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-500">存储路径（不可修改）</label>
+                <Input
+                  value={newStorage.config.path || ''}
+                  disabled
+                  className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                />
+              </div>
+            )}
+
+            {newStorage.config.type === 'minio' && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">Endpoint（不可修改）</label>
+                  <Input
+                    value={newStorage.config.endpoint || ''}
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">Bucket（不可修改）</label>
+                  <Input
+                    value={newStorage.config.bucket_name || ''}
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">Access Key ID（不可修改）</label>
+                  <Input
+                    value="********"
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">Secret Access Key（不可修改）</label>
+                  <Input
+                    value="********"
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+                <div className="flex items-center gap-2 opacity-50">
+                  <input
+                    type="checkbox"
+                    checked={newStorage.config.use_ssl === 'true'}
+                    disabled
+                    className="w-4 h-4 rounded border-slate-300"
+                  />
+                  <label className="text-sm text-slate-500">使用 SSL/TLS (HTTPS)</label>
+                </div>
+
+                {/* Direct Link 配置 - 可编辑 */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    直链访问配置
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="edit-enable-direct-link"
+                        checked={newStorage.config.enable_direct_link === 'true'}
+                        onChange={(e) =>
+                          setNewStorage({
+                            ...newStorage,
+                            config: { ...newStorage.config, enable_direct_link: String(e.target.checked) },
+                          })
+                        }
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <label htmlFor="edit-enable-direct-link" className="text-sm text-slate-700">
+                        启用直链访问
+                      </label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Public Endpoint</label>
+                      <Input
+                        value={newStorage.config.public_endpoint || ''}
+                        onChange={(e) =>
+                          setNewStorage({
+                            ...newStorage,
+                            config: { ...newStorage.config, public_endpoint: e.target.value },
+                          })
+                        }
+                        placeholder="https://cdn.example.com"
+                      />
+                      <p className="text-xs text-slate-500">
+                        用户访问图片时使用的 CDN 域名或 MinIO 外部地址
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="edit-public-bucket"
+                        checked={newStorage.config.is_public_bucket === 'true'}
+                        onChange={(e) =>
+                          setNewStorage({
+                            ...newStorage,
+                            config: { ...newStorage.config, is_public_bucket: String(e.target.checked) },
+                          })
+                        }
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <label htmlFor="edit-public-bucket" className="text-sm text-slate-700">
+                        公开 Bucket（无需签名访问）
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {newStorage.config.type === 'webdav' && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">WebDAV URL（不可修改）</label>
+                  <Input
+                    value={newStorage.config.webdav_url || ''}
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">用户名（不可修改）</label>
+                  <Input
+                    value={newStorage.config.webdav_username || ''}
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500">密码（不可修改）</label>
+                  <Input
+                    value="********"
+                    disabled
+                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsEditStorageOpen(false);
+                  setEditingStorageId(null);
+                  setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
+                }}
+              >
+                取消
+              </Button>
+              <Button onClick={handleUpdateStorage} className="bg-indigo-600 hover:bg-indigo-700">
+                保存修改
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
