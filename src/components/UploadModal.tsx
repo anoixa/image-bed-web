@@ -71,6 +71,7 @@ interface UploadModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (image: Image) => void;
+  storageId?: string;
 }
 
 interface UploadFile {
@@ -89,7 +90,7 @@ interface LinkFormat {
   value: string;
 }
 
-export default function UploadModal({ open, onOpenChange, onSuccess }: UploadModalProps) {
+export default function UploadModal({ open, onOpenChange, onSuccess, storageId }: UploadModalProps) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -201,7 +202,8 @@ export default function UploadModal({ open, onOpenChange, onSuccess }: UploadMod
       const progressInterval = simulateProgress(fileItem.id);
 
       try {
-        const image = await uploadImage(fileItem.file, true);
+        const strategyId = storageId ? parseInt(storageId, 10) : undefined;
+        const image = await uploadImage(fileItem.file, true, strategyId);
         clearInterval(progressInterval);
         updateFileStatus(fileItem.id, {
           status: 'success',

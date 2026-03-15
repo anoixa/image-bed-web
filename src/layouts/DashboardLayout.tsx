@@ -15,8 +15,13 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Database,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
+import { fetchStorageConfigs } from '@/api/configs';
+import type { StorageConfig } from '@/types';
 import {
   Dialog,
   DialogContent,
@@ -33,6 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/auth';
 import { toast } from '@/components/ui/use-toast';
 import UploadModal from '@/components/UploadModal';
@@ -135,6 +141,27 @@ export default function DashboardLayout() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // 存储选择器状态
+  const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
+  const [selectedStorage, setSelectedStorage] = useState<string>('');
+
+  // 加载存储配置
+  useEffect(() => {
+    fetchStorageConfigs()
+      .then((configs) => {
+        const filtered = configs.filter(c => c.category === 'storage' && c.is_enabled);
+        setStorageConfigs(filtered);
+        // 默认选择默认存储
+        const defaultStorage = filtered.find(c => c.is_default);
+        if (defaultStorage) {
+          setSelectedStorage(defaultStorage.id.toString());
+        } else if (filtered.length > 0) {
+          setSelectedStorage(filtered[0].id.toString());
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -332,8 +359,46 @@ export default function DashboardLayout() {
               </div>
             </div>
 
-            {/* Right: Upload + User */}
+            {/* Right: Storage Select + Upload + User */}
             <div className="flex items-center gap-3">
+              {/* 存储选择器 */}
+              {storageConfigs.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 min-w-[140px]">
+                      <Database className="h-4 w-4 text-slate-500" />
+                      <span className="truncate">
+                        {storageConfigs.find(c => c.id.toString() === selectedStorage)?.name || '选择存储'}
+                      </span>
+                      <ChevronDown className="h-4 w-4 ml-auto text-slate-500" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">选择存储</div>
+                    <DropdownMenuSeparator />
+                    {storageConfigs.map((config) => (
+                      <DropdownMenuItem
+                        key={config.id}
+                        onClick={() => setSelectedStorage(config.id.toString())}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <span className="truncate">{config.name}</span>
+                          <div className="flex items-center gap-2">
+                            {config.is_default && (
+                              <Badge variant="secondary" className="text-xs">默认</Badge>
+                            )}
+                            {selectedStorage === config.id.toString() && (
+                              <Check className="h-4 w-4 text-indigo-600" />
+                            )}
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
               <Button
                 onClick={() => setIsUploadOpen(true)}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
@@ -383,6 +448,7 @@ export default function DashboardLayout() {
         open={isUploadOpen}
         onOpenChange={handleUploadOpenChange}
         onSuccess={handleUploadSuccess}
+        storageId={selectedStorage}
       />
 
       {/* 修改密码弹窗 */}

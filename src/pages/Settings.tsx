@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe } from 'lucide-react';
+import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -937,6 +937,7 @@ export default function Settings() {
                           }`}
                         >
                           <div className="flex items-center gap-3">
+                            <Folder className="h-5 w-5 text-slate-400" />
                             <span className="text-sm font-medium">{album.name}</span>
                             <span className="text-xs text-slate-400">
                               {album.image_count} 张图片
