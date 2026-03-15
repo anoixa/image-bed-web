@@ -1,15 +1,27 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, Suspense, lazy } from 'react';
 import { useAuthStore } from '@/store/auth';
-import Login from '@/pages/Login';
-import DashboardLayout from '@/layouts/DashboardLayout';
-import Home from '@/pages/Home';
-import Dashboard from '@/pages/Dashboard';
-import Albums from '@/pages/Albums';
-import Tokens from '@/pages/Tokens';
-import Settings from '@/pages/Settings';
 import { Toaster } from '@/components/ui/toaster';
 import HttpsWarning from '@/components/HttpsWarning';
+import { Loader2 } from 'lucide-react';
+
+// Lazy load pages for code splitting
+const Login = lazy(() => import('@/pages/Login'));
+const DashboardLayout = lazy(() => import('@/layouts/DashboardLayout'));
+const Home = lazy(() => import('@/pages/Home'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const Albums = lazy(() => import('@/pages/Albums'));
+const Tokens = lazy(() => import('@/pages/Tokens'));
+const Settings = lazy(() => import('@/pages/Settings'));
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+    </div>
+  );
+}
 
 // 受保护的路由组件
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -55,31 +67,33 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Home />} />
-          <Route path="stats" element={<Dashboard />} />
-          <Route path="albums" element={<Albums />} />
-          <Route path="tokens" element={<Tokens />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Home />} />
+            <Route path="stats" element={<Dashboard />} />
+            <Route path="albums" element={<Albums />} />
+            <Route path="tokens" element={<Tokens />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
       <HttpsWarning />
       <Toaster />
     </BrowserRouter>

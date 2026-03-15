@@ -10,6 +10,39 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+          ],
+          'photo-view': ['react-photo-view'],
+        },
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: (assetInfo) => {
+          const name = assetInfo.name || ''
+          if (/\.(png|jpe?g|gif|svg|webp|ico)$/i.test(name)) {
+            return 'assets/images/[name]-[hash][extname]'
+          }
+          return 'assets/[name]-[hash][extname]'
+        },
+      },
+    },
+    minify: 'esbuild',
+    sourcemap: false,
+    target: 'esnext',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 500,
+  },
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   server: {
     proxy: {
       '/api': {
