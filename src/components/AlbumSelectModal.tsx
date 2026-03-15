@@ -75,7 +75,7 @@ export default function AlbumSelectModal({
 
     setSubmitting(true);
     try {
-      await addImagesToAlbum(selectedAlbumId, validIdentifiers.map(id => parseInt(id, 10)).filter(id => !isNaN(id)));
+      await addImagesToAlbum(selectedAlbumId, validIdentifiers as string[]);
       toast({
         title: '添加成功',
         description: `已成功添加 ${imageIdentifiers.length} 张图片到相册`,

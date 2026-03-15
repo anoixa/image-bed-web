@@ -18,6 +18,8 @@ import {
   Database,
   ChevronDown,
   Check,
+  HardDrive,
+  Server,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
 import { fetchStorageConfigs } from '@/api/configs';
@@ -145,6 +147,20 @@ export default function DashboardLayout() {
   // 存储选择器状态
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [selectedStorage, setSelectedStorage] = useState<string>('');
+
+  // 获取存储类型图标
+  const getStorageIcon = (type?: string) => {
+    switch (type) {
+      case 'minio':
+        return <Server className="h-4 w-4 text-slate-500" />;
+      case 'local':
+        return <HardDrive className="h-4 w-4 text-slate-500" />;
+      case 'webdav':
+        return <Database className="h-4 w-4 text-slate-500" />;
+      default:
+        return <Database className="h-4 w-4 text-slate-500" />;
+    }
+  };
 
   // 加载存储配置
   useEffect(() => {
@@ -366,7 +382,11 @@ export default function DashboardLayout() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 min-w-[140px]">
-                      <Database className="h-4 w-4 text-slate-500" />
+                      {(() => {
+                        const selectedConfig = storageConfigs.find(c => c.id.toString() === selectedStorage);
+                        const storageType = (selectedConfig?.config as Record<string, string>)?.type;
+                        return getStorageIcon(storageType);
+                      })()}
                       <span className="truncate">
                         {storageConfigs.find(c => c.id.toString() === selectedStorage)?.name || '选择存储'}
                       </span>
@@ -376,25 +396,31 @@ export default function DashboardLayout() {
                   <DropdownMenuContent align="end" className="w-56">
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">选择存储</div>
                     <DropdownMenuSeparator />
-                    {storageConfigs.map((config) => (
-                      <DropdownMenuItem
-                        key={config.id}
-                        onClick={() => setSelectedStorage(config.id.toString())}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="truncate">{config.name}</span>
-                          <div className="flex items-center gap-2">
-                            {config.is_default && (
-                              <Badge variant="secondary" className="text-xs">默认</Badge>
-                            )}
-                            {selectedStorage === config.id.toString() && (
-                              <Check className="h-4 w-4 text-indigo-600" />
-                            )}
+                    {storageConfigs.map((config) => {
+                      const storageType = (config.config as Record<string, string>)?.type;
+                      return (
+                        <DropdownMenuItem
+                          key={config.id}
+                          onClick={() => setSelectedStorage(config.id.toString())}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center gap-2">
+                              {getStorageIcon(storageType)}
+                              <span className="truncate">{config.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {config.is_default && (
+                                <Badge variant="secondary" className="text-xs">默认</Badge>
+                              )}
+                              {selectedStorage === config.id.toString() && (
+                                <Check className="h-4 w-4 text-indigo-600" />
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
+                        </DropdownMenuItem>
+                      );
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}

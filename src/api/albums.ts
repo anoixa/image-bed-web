@@ -1,7 +1,7 @@
 import { get, post, put, del } from '@/lib/request';
 import type { Album, AlbumDetail, AlbumImage } from '@/types';
 
-// 相册列表响应结构 - 匹配后端Swagger定义 (albums.ListAlbumsResponse)
+// 相册列表响应结构
 interface AlbumsResponse {
   albums: Album[];
   total: number;
@@ -14,7 +14,7 @@ interface AlbumsResponse {
 interface AddImagesToAlbumResponse {
   album_id: number;
   added_count: number;
-  failed_ids: number[];
+  failed_identifiers: string[];
 }
 
 // 获取相册列表 - GET /api/v1/albums
@@ -51,10 +51,10 @@ export const deleteAlbum = (id: string | number): Promise<void> => {
 // 添加图片到相册 - POST /api/v1/albums/{id}/images
 export const addImagesToAlbum = (
   albumId: string | number,
-  imageIds: number[]
+  identifiers: string[]
 ): Promise<AddImagesToAlbumResponse> => {
   const url = `/api/v1/albums/${albumId}/images`;
-  return post<AddImagesToAlbumResponse>(url, { image_ids: imageIds });
+  return post<AddImagesToAlbumResponse>(url, { identifiers });
 };
 
 // 从相册移除图片 - DELETE /api/v1/albums/{id}/images/{imageId}
