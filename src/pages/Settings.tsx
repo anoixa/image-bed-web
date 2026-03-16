@@ -428,7 +428,10 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">系统设置</h1>
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Settings2 className="w-6 h-6 text-indigo-600" />
+          系统设置
+        </h1>
         <p className="text-slate-500 mt-1">管理存储配置和系统参数</p>
       </div>
 

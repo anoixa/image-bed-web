@@ -77,7 +77,10 @@ export default function Dashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">仪表盘</h1>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-indigo-600" />
+              仪表盘
+            </h1>
             <p className="text-slate-500 mt-1">系统概览与统计</p>
           </div>
         </div>
@@ -108,7 +111,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">仪表盘</h1>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-indigo-600" />
+            仪表盘
+          </h1>
           <p className="text-slate-500 mt-1">系统概览与统计</p>
         </div>
         <Button

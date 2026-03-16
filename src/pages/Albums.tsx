@@ -177,7 +177,10 @@ export default function Albums() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">相册管理</h1>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Folder className="w-6 h-6 text-indigo-600" />
+            相册管理
+          </h1>
           <p className="text-slate-500 mt-1">创建和管理您的图片相册</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

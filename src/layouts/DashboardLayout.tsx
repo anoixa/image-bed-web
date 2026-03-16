@@ -21,9 +21,10 @@ import {
   HardDrive,
   Server,
   BookOpen,
+  Cloud,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
-import { fetchStorageConfigs } from '@/api/configs';
+import { fetchStorageConfigs, setDefaultStorageConfig } from '@/api/configs';
 import type { StorageConfig } from '@/types';
 import {
   Dialog,
@@ -147,15 +148,14 @@ export default function DashboardLayout() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  // 存储选择器状态
+  // 存储配置列表
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
-  const [selectedStorage, setSelectedStorage] = useState<string>('');
 
   // 获取存储类型图标
   const getStorageIcon = (type?: string) => {
     switch (type) {
-      case 'minio':
-        return <Server className="h-4 w-4 text-slate-500" />;
+      case 's3':
+        return <Cloud className="h-4 w-4 text-slate-500" />;
       case 'local':
         return <HardDrive className="h-4 w-4 text-slate-500" />;
       case 'webdav':
@@ -171,13 +171,6 @@ export default function DashboardLayout() {
       .then((configs) => {
         const filtered = configs.filter(c => c.category === 'storage' && c.is_enabled);
         setStorageConfigs(filtered);
-        // 默认选择默认存储
-        const defaultStorage = filtered.find(c => c.is_default);
-        if (defaultStorage) {
-          setSelectedStorage(defaultStorage.id.toString());
-        } else if (filtered.length > 0) {
-          setSelectedStorage(filtered[0].id.toString());
-        }
       })
       .catch(console.error);
   }, []);
@@ -380,31 +373,49 @@ export default function DashboardLayout() {
 
             {/* Right: Storage Select + Upload + User */}
             <div className="flex items-center gap-3">
-              {/* 存储选择器 */}
+              {/* 默认存储设置 */}
               {storageConfigs.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-md text-sm hover:bg-slate-50 min-w-[140px]">
                       {(() => {
-                        const selectedConfig = storageConfigs.find(c => c.id.toString() === selectedStorage);
-                        const storageType = (selectedConfig?.config as Record<string, string>)?.type;
+                        const defaultConfig = storageConfigs.find(c => c.is_default);
+                        const storageType = (defaultConfig?.config as Record<string, string>)?.type;
                         return getStorageIcon(storageType);
                       })()}
                       <span className="truncate">
-                        {storageConfigs.find(c => c.id.toString() === selectedStorage)?.name || '选择存储'}
+                        {storageConfigs.find(c => c.is_default)?.name || '设置默认存储'}
                       </span>
                       <ChevronDown className="h-4 w-4 ml-auto text-slate-500" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
-                    <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">选择存储</div>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-slate-500">点击设置默认存储</div>
                     <DropdownMenuSeparator />
                     {storageConfigs.map((config) => {
                       const storageType = (config.config as Record<string, string>)?.type;
                       return (
                         <DropdownMenuItem
                           key={config.id}
-                          onClick={() => setSelectedStorage(config.id.toString())}
+                          onClick={async () => {
+                            try {
+                              await setDefaultStorageConfig(config.id);
+                              // 刷新存储配置列表
+                              const configs = await fetchStorageConfigs();
+                              const filteredConfigs = (configs as StorageConfig[]).filter((c: StorageConfig) => c.category === 'storage');
+                              setStorageConfigs(filteredConfigs);
+                              toast({
+                                title: '设置成功',
+                                description: `${config.name} 已设为默认存储`,
+                              });
+                            } catch (error) {
+                              toast({
+                                title: '设置失败',
+                                description: error instanceof Error ? error.message : '请稍后重试',
+                                variant: 'destructive',
+                              });
+                            }
+                          }}
                           className="cursor-pointer"
                         >
                           <div className="flex items-center justify-between w-full">
@@ -416,7 +427,7 @@ export default function DashboardLayout() {
                               {config.is_default && (
                                 <Badge variant="secondary" className="text-xs">默认</Badge>
                               )}
-                              {selectedStorage === config.id.toString() && (
+                              {config.is_default && (
                                 <Check className="h-4 w-4 text-indigo-600" />
                               )}
                             </div>
@@ -477,7 +488,6 @@ export default function DashboardLayout() {
         open={isUploadOpen}
         onOpenChange={handleUploadOpenChange}
         onSuccess={handleUploadSuccess}
-        storageId={selectedStorage}
       />
 
       {/* 修改密码弹窗 */}

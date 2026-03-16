@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Server, HardDrive, Database, Pencil, Star, TestTube } from 'lucide-react';
+import { Plus, Trash2, Loader2, Server, HardDrive, Database, Pencil, Star, TestTube, Cloud } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
-type StorageType = 'local' | 'minio' | 'webdav';
+type StorageType = 'local' | 's3' | 'webdav';
 
 interface StorageFormData {
   name: string;
@@ -35,7 +35,7 @@ interface StorageFormData {
 
 const STORAGE_TYPES: { type: StorageType; label: string; icon: typeof Server }[] = [
   { type: 'local', label: '本地存储', icon: HardDrive },
-  { type: 'minio', label: 'MinIO', icon: Database },
+  { type: 's3', label: 'S3 存储', icon: Cloud },
   { type: 'webdav', label: 'WebDAV', icon: Server },
 ];
 
@@ -54,15 +54,16 @@ const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
       { key: 'base_url', label: '基础URL', placeholder: 'https://example.com/images', required: true },
     ],
   },
-  minio: {
+  s3: {
     fields: [
-      { key: 'endpoint', label: 'Endpoint', placeholder: 'http://localhost:9000', required: true },
-      { key: 'bucket', label: 'Bucket', placeholder: 'my-bucket', required: true },
-      { key: 'access_key', label: 'Access Key', required: true },
-      { key: 'secret_key', label: 'Secret Key', type: 'password', required: true },
+      { key: 'endpoint', label: 'Endpoint', placeholder: 'https://s3.amazonaws.com 或 http://localhost:9000', required: true },
       { key: 'region', label: 'Region', placeholder: 'us-east-1' },
-      { key: 'use_ssl', label: '使用 SSL', type: 'switch' },
-      { key: 'base_url', label: '自定义域名', placeholder: 'https://cdn.example.com' },
+      { key: 'bucket_name', label: 'Bucket 名称', placeholder: 'my-bucket', required: true },
+      { key: 'access_key_id', label: 'Access Key ID', required: true },
+      { key: 'secret_access_key', label: 'Secret Access Key', type: 'password', required: true },
+      { key: 'force_path_style', label: 'Path Style 访问 (MinIO需要开启)', type: 'switch' },
+      { key: 'public_domain', label: '自定义域名', placeholder: 'https://cdn.example.com' },
+      { key: 'is_private', label: '私有 Bucket', type: 'switch' },
     ],
   },
   webdav: {
@@ -355,8 +356,11 @@ export default function StorageConfigs() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">存储配置</h1>
-          <p className="text-slate-500 mt-1">管理图片存储后端（本地、MinIO、WebDAV）</p>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Database className="w-6 h-6 text-indigo-600" />
+            存储配置
+          </h1>
+          <p className="text-slate-500 mt-1">管理图片存储后端（本地、S3、WebDAV）</p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
@@ -410,8 +414,8 @@ export default function StorageConfigs() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <div className="text-sm text-slate-600 space-y-1">
+              <CardContent className="pt-0 flex flex-col">
+                <div className="text-sm text-slate-600 space-y-1 flex-1 min-h-[44px]">
                   {getConfigValue(config.config, 'base_url') && (
                     <p className="truncate" title={getConfigValue(config.config, 'base_url')}>
                       URL: {getConfigValue(config.config, 'base_url')}
@@ -422,8 +426,13 @@ export default function StorageConfigs() {
                       Endpoint: {getConfigValue(config.config, 'endpoint')}
                     </p>
                   )}
-                  {getConfigValue(config.config, 'bucket') && (
-                    <p>Bucket: {getConfigValue(config.config, 'bucket')}</p>
+                  {getConfigValue(config.config, 'bucket_name') && (
+                    <p>Bucket: {getConfigValue(config.config, 'bucket_name')}</p>
+                  )}
+                  {getConfigValue(config.config, 'public_domain') && (
+                    <p className="truncate" title={getConfigValue(config.config, 'public_domain')}>
+                      Domain: {getConfigValue(config.config, 'public_domain')}
+                    </p>
                   )}
                 </div>
                 
