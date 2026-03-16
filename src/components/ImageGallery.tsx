@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Loader2, ImageIcon, FolderOpen, Filter, X, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Album as AlbumIcon } from 'lucide-react';
+import { Loader2, ImageIcon, FolderOpen, Filter, X, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Album as AlbumIcon, Trash2, CheckSquare, Square, FolderMinus, FolderPlus } from 'lucide-react';
 import { PhotoProvider } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
 import ImageCard from './ImageCard';
@@ -14,11 +14,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { fetchImages, deleteImage } from '@/api/images';
-import { fetchAlbums } from '@/api/albums';
+import { fetchImages, deleteImage, deleteImages } from '@/api/images';
+import { fetchAlbums, removeImagesFromAlbum } from '@/api/albums';
 import type { Image, PaginatedResponse, Album } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Link, useSearchParams } from 'react-router-dom';
+import ConfirmDialog from './ConfirmDialog';
+import AlbumSelectModal from './AlbumSelectModal';
 
 interface ImageGalleryProps {
   albumId?: number | null;
@@ -53,6 +55,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const hasInitialized = useRef(false);
   const wasHidden = useRef(false);
   const currentSearchRef = useRef(searchQuery);
+
+  // 批量操作状态
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [isBatchRemoving, setIsBatchRemoving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   // 加载相册列表
   useEffect(() => {
@@ -240,6 +250,96 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     }
   };
 
+  // 批量选择处理
+  const handleSelectImage = (identifier: string, selected: boolean) => {
+    setSelectedImages((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(identifier);
+      } else {
+        newSet.delete(identifier);
+      }
+      return newSet;
+    });
+  };
+
+  // 全选/取消全选
+  const handleSelectAll = () => {
+    if (selectedImages.size === images.length) {
+      setSelectedImages(new Set());
+    } else {
+      setSelectedImages(new Set(images.map(img => img.identifier)));
+    }
+  };
+
+  // 退出批量模式
+  const exitBatchMode = () => {
+    setIsBatchMode(false);
+    setSelectedImages(new Set());
+  };
+
+  // 批量删除
+  const handleBatchDelete = async () => {
+    if (selectedImages.size === 0) return;
+    
+    setIsBatchDeleting(true);
+    try {
+      const identifiers = Array.from(selectedImages);
+      await deleteImages(identifiers);
+      
+      // 从列表中移除已删除的图片
+      setImages((prev) => prev.filter((img) => !selectedImages.has(img.identifier)));
+      
+      toast({
+        title: '批量删除成功',
+        description: `成功删除 ${identifiers.length} 张图片`,
+      });
+      
+      // 退出批量模式
+      exitBatchMode();
+    } catch (error) {
+      toast({
+        title: '批量删除失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBatchDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // 批量从相册移除
+  const handleBatchRemoveFromAlbum = async () => {
+    if (selectedImages.size === 0 || !effectiveAlbumId) return;
+    
+    setIsBatchRemoving(true);
+    try {
+      const identifiers = Array.from(selectedImages);
+      const response = await removeImagesFromAlbum(effectiveAlbumId, identifiers);
+      
+      // 从列表中移除已从相册移除的图片
+      setImages((prev) => prev.filter((img) => !selectedImages.has(img.identifier)));
+      
+      toast({
+        title: '批量移除成功',
+        description: `成功从相册移除 ${response.removed_count} 张图片`,
+      });
+      
+      // 退出批量模式
+      exitBatchMode();
+    } catch (error) {
+      toast({
+        title: '批量移除失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBatchRemoving(false);
+      setShowRemoveConfirm(false);
+    }
+  };
+
   // 获取筛选显示文本
   const getVisibilityLabel = () => {
     switch (visibilityFilter) {
@@ -326,8 +426,19 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
           <p className="text-slate-500">{subtitle}</p>
         </div>
 
-        {/* 筛选栏 */}
+        {/* 批量操作按钮 / 筛选栏 */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* 批量选择按钮 */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsBatchMode(true)}
+            className="gap-2"
+          >
+            <CheckSquare className="h-4 w-4" />
+            批量选择
+          </Button>
+
           {/* 可见性筛选 */}
           {!currentAlbum && (
             <DropdownMenu>
@@ -478,9 +589,83 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         </div>
         <p className="text-slate-500">{subtitle}</p>
 
-        {/* 筛选栏 */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          {/* 可见性筛选 */}
+        {/* 批量操作工具栏 / 筛选栏 */}
+        {isBatchMode ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSelectAll}
+                className="gap-2 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-100"
+              >
+                {selectedImages.size === images.length ? (
+                  <CheckSquare className="h-4 w-4" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+                {selectedImages.size === images.length ? '取消全选' : '全选'}
+              </Button>
+              <span className="text-sm text-indigo-700">
+                已选择 <strong>{selectedImages.size}</strong> 张图片
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exitBatchMode}
+                className="border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+              >
+                取消
+              </Button>
+              {/* 在相册页面显示移除按钮 */}
+              {effectiveAlbumId && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowRemoveConfirm(true)}
+                  disabled={selectedImages.size === 0 || isBatchRemoving}
+                  className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50"
+                >
+                  {isBatchRemoving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FolderMinus className="h-4 w-4" />
+                  )}
+                  从相册移除
+                </Button>
+              )}
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={selectedImages.size === 0 || isBatchDeleting}
+                className="gap-2"
+              >
+                {isBatchDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                删除选中
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 mt-4">
+            {/* 批量删除按钮 */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBatchMode(true)}
+              className="gap-2"
+            >
+              <CheckSquare className="h-4 w-4" />
+              批量选择
+            </Button>
+
+            {/* 可见性筛选 */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
@@ -583,6 +768,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
             </Button>
           )}
         </div>
+        )}
 
         {/* 当前筛选标签 */}
         {hasActiveFilters && (
@@ -602,6 +788,30 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
           </div>
         )}
       </div>
+
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="确认批量删除"
+        description={`确定要删除选中的 ${selectedImages.size} 张图片吗？此操作不可恢复。`}
+        onConfirm={handleBatchDelete}
+        confirmText="删除"
+        cancelText="取消"
+        variant="destructive"
+      />
+
+      {/* 从相册移除确认对话框 */}
+      <ConfirmDialog
+        open={showRemoveConfirm}
+        onOpenChange={setShowRemoveConfirm}
+        title="确认从相册移除"
+        description={`确定要从相册中移除选中的 ${selectedImages.size} 张图片吗？图片不会被删除，只是从当前相册中移除。`}
+        onConfirm={handleBatchRemoveFromAlbum}
+        confirmText="移除"
+        cancelText="取消"
+        variant="default"
+      />
 
       {/* Masonry Image Grid with Lightbox */}
       <PhotoProvider
@@ -626,6 +836,9 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
                 currentAlbumId={effectiveAlbumId}
                 onAlbumChange={() => loadImages(1, false)}
                 onVisibilityChange={() => loadImages(1, false)}
+                selectable={isBatchMode}
+                selected={selectedImages.has(image.identifier)}
+                onSelect={handleSelectImage}
               />
             </div>
           ))}

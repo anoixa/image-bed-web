@@ -3,6 +3,7 @@ import { Link2, Trash2, Maximize2, FolderPlus, FolderMinus, Eye, EyeOff } from '
 import { PhotoView } from 'react-photo-view';
 import type { Image } from '@/types';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/components/ui/use-toast';
 import AlbumSelectModal from './AlbumSelectModal';
 import { removeImageFromAlbum } from '@/api/albums';
@@ -14,9 +15,21 @@ interface ImageCardProps {
   currentAlbumId?: number | null;
   onAlbumChange?: () => void;
   onVisibilityChange?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (identifier: string, selected: boolean) => void;
 }
 
-export default function ImageCard({ image, onDelete, currentAlbumId, onAlbumChange, onVisibilityChange }: ImageCardProps) {
+export default function ImageCard({
+  image,
+  onDelete,
+  currentAlbumId,
+  onAlbumChange,
+  onVisibilityChange,
+  selectable = false,
+  selected = false,
+  onSelect
+}: ImageCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
@@ -76,6 +89,12 @@ export default function ImageCard({ image, onDelete, currentAlbumId, onAlbumChan
     if (onDelete) {
       onDelete(image.identifier);
     }
+  };
+
+  const handleSelect = (e: React.MouseEvent | React.ChangeEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onSelect?.(image.identifier, !selected);
   };
 
   const handleAddToAlbum = (e: React.MouseEvent) => {
@@ -143,11 +162,24 @@ export default function ImageCard({ image, onDelete, currentAlbumId, onAlbumChan
 
   return (
     <div
-      className="relative break-inside-avoid mb-4 rounded-xl overflow-hidden bg-slate-200 cursor-pointer shadow-sm hover:shadow-lg transition-all duration-300"
+      className={`relative break-inside-avoid mb-4 rounded-xl overflow-hidden bg-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 ${selectable ? 'cursor-default' : 'cursor-pointer'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ contain: 'layout style paint' }}
     >
+      {/* 批量选择复选框 */}
+      {selectable && (
+        <div
+          className="absolute top-3 left-3 z-20"
+          onClick={handleSelect}
+        >
+          <Checkbox
+            checked={selected}
+            className={`w-5 h-5 border-2 ${selected ? 'bg-indigo-500 border-indigo-500' : 'bg-white/80 border-white/50'} data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500`}
+          />
+        </div>
+      )}
+      
       {/* 骨架屏占位 - 使用padding-bottom撑开高度 */}
       <div
         className="relative w-full"

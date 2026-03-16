@@ -17,6 +17,13 @@ interface AddImagesToAlbumResponse {
   failed_identifiers: string[];
 }
 
+// 从相册移除图片的响应
+interface RemoveImagesFromAlbumResponse {
+  album_id: number;
+  removed_count: number;
+  failed_identifiers: string[];
+}
+
 // 获取相册列表 - GET /api/v1/albums
 export const fetchAlbums = (page: number = 1, limit: number = 20): Promise<Album[]> => {
   return get<AlbumsResponse>(`/api/v1/albums?page=${page}&limit=${limit}`).then(
@@ -63,4 +70,13 @@ export const removeImageFromAlbum = (
   imageId: string | number
 ): Promise<void> => {
   return del(`/api/v1/albums/${albumId}/images/${imageId}`);
+};
+
+// 批量从相册移除图片 - POST /api/v1/albums/{id}/images/remove
+export const removeImagesFromAlbum = (
+  albumId: string | number,
+  identifiers: string[]
+): Promise<RemoveImagesFromAlbumResponse> => {
+  const url = `/api/v1/albums/${albumId}/images/remove`;
+  return post<RemoveImagesFromAlbumResponse>(url, { identifiers });
 };
