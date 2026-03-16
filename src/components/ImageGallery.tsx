@@ -848,21 +848,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         loaderRef={loaderRef}
       />
 
-      {/* Infinite Scroll Loader */}
-      <div
-        ref={loaderRef}
-        className="flex justify-center py-8"
-      >
-        {loading && hasMore && (
-          <div className="flex items-center gap-2 text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>加载中...</span>
-          </div>
-        )}
-        {!hasMore && images.length > 0 && (
-          <p className="text-slate-400 text-sm">已加载全部 {images.length} 张图片</p>
-        )}
-      </div>
     </div>
   );
 }

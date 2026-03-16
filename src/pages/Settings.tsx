@@ -433,8 +433,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="storage">存储配置</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="transfer">传输设置</TabsTrigger>
           <TabsTrigger value="background">登录背景</TabsTrigger>
           <TabsTrigger value="system">系统信息</TabsTrigger>
