@@ -385,23 +385,22 @@ export default function JustifiedGallery({
           </div>
         )}
 
-        {hasActiveFilters && (
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            {visibilityFilter !== 'all' && (
-              <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-slate-200" onClick={() => setVisibilityFilter?.('all')}>
-                {getVisibilityLabel()}
-                <X className="h-3 w-3" />
-              </Badge>
-            )}
-            {albumFilter !== 'all' && (
-              <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-slate-200" onClick={() => setAlbumFilter?.('all')}>
-                {getAlbumLabel()}
-                <X className="h-3 w-3" />
-              </Badge>
-            )}
-          </div>
-        )}
-      </div>
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {visibilityFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-slate-200" onClick={() => setVisibilityFilter?.('all')}>
+              {getVisibilityLabel()}
+              <X className="h-3 w-3" />
+            </Badge>
+          )}
+          {albumFilter !== 'all' && (
+            <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-slate-200" onClick={() => setAlbumFilter?.('all')}>
+              {getAlbumLabel()}
+              <X className="h-3 w-3" />
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* 确认对话框 */}
       <ConfirmDialog
