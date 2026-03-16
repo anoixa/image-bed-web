@@ -440,7 +440,7 @@ export default function ApiDocs() {
         <div className="text-sm text-amber-800">
           <p className="font-medium">认证方式</p>
           <p className="mt-1">
-            所有需要认证的接口都需要在请求头中添加 <code className="bg-amber-100 px-1 py-0.5 rounded">X-API-Key</code>。
+            所有需要认证的接口都需要在请求头中添加 <code className="bg-amber-100 px-1 py-0.5 rounded">Authorization</code>。
             你可以在 <strong>API Token</strong> 页面生成和管理 API Key。
           </p>
         </div>
@@ -497,7 +497,7 @@ export default function ApiDocs() {
           </div>
           <div>
             <p className="text-slate-500 mb-1">认证 Header</p>
-            <code className="bg-white px-2 py-1 rounded border text-slate-700">X-API-Key: your-token</code>
+            <code className="bg-white px-2 py-1 rounded border text-slate-700">Authorization: ApiKey your-token</code>
           </div>
         </div>
       </div>

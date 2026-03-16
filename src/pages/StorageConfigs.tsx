@@ -431,7 +431,7 @@ export default function StorageConfigs() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 h-full"
+                    className="flex-1 h-9"
                     onClick={() => openEditDialog(config)}
                   >
                     <Pencil className="w-4 h-4 mr-1" />
@@ -440,7 +440,7 @@ export default function StorageConfigs() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 h-full"
+                    className="flex-1 h-9"
                     onClick={() => handleTest(config.id)}
                     disabled={testingId === config.id}
                   >
@@ -452,12 +452,12 @@ export default function StorageConfigs() {
                     测试
                   </Button>
                   {config.is_default ? (
-                    <div className="w-9 h-full" />
+                    <div className="w-9 h-9" />
                   ) : (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-full w-9 p-0"
+                      className="h-9 w-9 p-0"
                       onClick={() => handleSetDefault(config.id)}
                     >
                       <Star className="w-4 h-4" />
@@ -466,7 +466,7 @@ export default function StorageConfigs() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 h-full w-9 p-0"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 h-9 w-9 p-0"
                     onClick={() => handleDelete(config.id)}
                   >
                     <Trash2 className="w-4 h-4" />

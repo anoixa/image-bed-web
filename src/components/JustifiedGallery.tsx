@@ -95,7 +95,7 @@ export default function JustifiedGallery({
   error,
   currentAlbum,
   albums = [],
-  title = '图片列表',
+  title,
   subtitle,
   visibilityFilter = 'all',
   albumFilter = 'all',
@@ -244,19 +244,6 @@ export default function JustifiedGallery({
   if (images.length === 0 && !loading) {
     return (
       <div className="space-y-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
-            {currentAlbum && (
-              <Link to="/albums" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-                返回相册
-              </Link>
-            )}
-          </div>
-          <p className="text-slate-500">{subtitle || (currentAlbum ? '该相册还没有图片' : '点击右上角上传图片开始使用')}</p>
-        </div>
-
         {/* Empty State */}
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
@@ -279,19 +266,7 @@ export default function JustifiedGallery({
 
   return (
     <div className="space-y-6" ref={containerRef}>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2 flex-wrap">
-          <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
-          {currentAlbum && (
-            <Link to="/albums" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
-              返回相册
-            </Link>
-          )}
-        </div>
-        <p className="text-slate-500">{subtitle}</p>
-
-        {/* 批量操作工具栏 / 筛选栏 */}
+      {/* 批量操作工具栏 / 筛选栏 */}
         {isBatchMode ? (
           <div className="flex flex-wrap items-center justify-between gap-2 mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
             <div className="flex items-center gap-3">

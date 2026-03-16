@@ -375,11 +375,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     return (
       <PhotoProvider>
         <div className="space-y-8">
-          {/* Header Skeleton */}
-          <div className="mb-8">
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
           {/* Masonry Skeleton */}
           <div className="columns-2 lg:columns-4 gap-4 space-y-4">
             {Array.from({ length: 12 }).map((_, i) => (

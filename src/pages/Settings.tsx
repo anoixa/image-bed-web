@@ -39,7 +39,7 @@ export default function Settings() {
   const [isCreateStorageOpen, setIsCreateStorageOpen] = useState(false);
   const [isEditStorageOpen, setIsEditStorageOpen] = useState(false);
   const [editingStorageId, setEditingStorageId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState('storage');
+  const [activeTab, setActiveTab] = useState('transfer');
 
   // 确认弹窗状态
   const [confirmDialog, setConfirmDialog] = useState<{
