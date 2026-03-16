@@ -20,6 +20,7 @@ import {
   Check,
   HardDrive,
   Server,
+  BookOpen,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
 import { fetchStorageConfigs } from '@/api/configs';
@@ -56,6 +57,8 @@ const navItems: NavItem[] = [
   { path: '/stats', label: '统计大屏', icon: BarChart3 },
   { path: '/albums', label: '相册管理', icon: Folder },
   { path: '/tokens', label: 'API Token', icon: Key },
+  { path: '/storage', label: '存储配置', icon: Database },
+  { path: '/api-docs', label: 'API 文档', icon: BookOpen },
   { path: '/settings', label: '系统设置', icon: Settings },
 ];
 

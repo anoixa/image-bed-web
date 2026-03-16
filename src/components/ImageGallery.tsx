@@ -3,6 +3,7 @@ import { Loader2, ImageIcon, FolderOpen, Filter, X, ChevronDown, ArrowUpDown, Ar
 import { PhotoProvider } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
 import ImageCard from './ImageCard';
+import JustifiedGallery from './JustifiedGallery';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -813,38 +814,39 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         variant="default"
       />
 
-      {/* Masonry Image Grid with Lightbox */}
-      <PhotoProvider
-        maskOpacity={0.85}
-        loop={true}
-        maskClosable={true}
-        pullClosable={true}
-      >
-        {/* 等高网格布局：使用 CSS Grid 替代 Masonry */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-          {images.map((image, index) => (
-            <div
-              key={image.id}
-              className="animate-fade-in-up h-full"
-              style={{
-                animationDelay: `${(index % 8) * 50}ms`,
-                animationFillMode: 'both',
-              }}
-            >
-              <ImageCard
-                image={image}
-                onDelete={handleDelete}
-                currentAlbumId={effectiveAlbumId}
-                onAlbumChange={() => loadImages(1, false)}
-                onVisibilityChange={() => loadImages(1, false)}
-                selectable={isBatchMode}
-                selected={selectedImages.has(image.identifier)}
-                onSelect={handleSelectImage}
-              />
-            </div>
-          ))}
-        </div>
-      </PhotoProvider>
+      {/* Justified Layout Gallery - 等高瀑布流布局 */}
+      <JustifiedGallery
+        images={images}
+        loading={loading}
+        hasMore={hasMore}
+        error={error}
+        currentAlbum={currentAlbum}
+        albums={albums}
+        title={title}
+        subtitle={subtitle}
+        visibilityFilter={visibilityFilter}
+        albumFilter={albumFilter}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        isBatchMode={isBatchMode}
+        selectedImages={selectedImages}
+        onLoadMore={() => loadImages(currentPage + 1, true)}
+        onDelete={handleDelete}
+        onBatchDelete={handleBatchDelete}
+        onBatchRemoveFromAlbum={handleBatchRemoveFromAlbum}
+        onSelectImage={handleSelectImage}
+        onSelectAll={handleSelectAll}
+        onExitBatchMode={exitBatchMode}
+        onVisibilityChange={() => loadImages(1, false)}
+        onAlbumChange={() => loadImages(1, false)}
+        setVisibilityFilter={setVisibilityFilter}
+        setAlbumFilter={setAlbumFilter}
+        setSortBy={setSortBy}
+        setSortOrder={setSortOrder}
+        setIsBatchMode={setIsBatchMode}
+        effectiveAlbumId={effectiveAlbumId}
+        loaderRef={loaderRef}
+      />
 
       {/* Infinite Scroll Loader */}
       <div

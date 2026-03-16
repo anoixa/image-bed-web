@@ -13,6 +13,8 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const Albums = lazy(() => import('@/pages/Albums'));
 const Tokens = lazy(() => import('@/pages/Tokens'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const StorageConfigs = lazy(() => import('@/pages/StorageConfigs'));
+const ApiDocs = lazy(() => import('@/pages/ApiDocs'));
 
 // Loading fallback component
 function PageLoader() {
@@ -90,6 +92,8 @@ function App() {
             <Route path="albums" element={<Albums />} />
             <Route path="tokens" element={<Tokens />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="storage" element={<StorageConfigs />} />
+            <Route path="api-docs" element={<ApiDocs />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
