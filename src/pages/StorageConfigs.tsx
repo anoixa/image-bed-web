@@ -45,25 +45,26 @@ interface ConfigField {
   type?: string;
   placeholder?: string;
   required?: boolean;
+  description?: string;
 }
 
 const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
   local: {
     fields: [
-      { key: 'base_path', label: '基础路径', placeholder: '/data/images', required: true },
-      { key: 'base_url', label: '基础URL', placeholder: 'https://example.com/images', required: true },
+      { key: 'base_path', label: '基础路径', placeholder: '/data/images', required: true, description: '服务器上存储图片的本地路径' },
+      { key: 'base_url', label: '基础URL', placeholder: 'https://example.com/images', required: true, description: '访问图片的URL前缀，需配合Nginx等反向代理' },
     ],
   },
   s3: {
     fields: [
-      { key: 'endpoint', label: 'Endpoint', placeholder: 'https://s3.amazonaws.com 或 http://localhost:9000', required: true },
-      { key: 'region', label: 'Region', placeholder: 'us-east-1' },
-      { key: 'bucket_name', label: 'Bucket 名称', placeholder: 'my-bucket', required: true },
-      { key: 'access_key_id', label: 'Access Key ID', required: true },
-      { key: 'secret_access_key', label: 'Secret Access Key', type: 'password', required: true },
-      { key: 'force_path_style', label: 'Path Style 访问 (MinIO需要开启)', type: 'switch' },
-      { key: 'public_domain', label: '自定义域名', placeholder: 'https://cdn.example.com' },
-      { key: 'is_private', label: '私有 Bucket', type: 'switch' },
+      { key: 'endpoint', label: 'Endpoint', placeholder: 'https://s3.amazonaws.com 或 http://localhost:9000', required: true, description: 'S3 服务端点，AWS S3 使用 https://s3.amazonaws.com，MinIO 使用 http://ip:9000' },
+      { key: 'region', label: 'Region', placeholder: 'us-east-1', description: 'S3 区域，如 us-east-1、ap-northeast-1、auto (R2)' },
+      { key: 'bucket_name', label: 'Bucket 名称', placeholder: 'my-bucket', required: true, description: '存储桶名称' },
+      { key: 'access_key_id', label: 'Access Key ID', required: true, description: '访问密钥 ID' },
+      { key: 'secret_access_key', label: 'Secret Access Key', type: 'password', required: true, description: '访问密钥密码' },
+      { key: 'force_path_style', label: 'Path Style 访问', type: 'switch', description: 'MinIO/自建 S3 需开启，AWS S3 需关闭' },
+      { key: 'public_domain', label: '自定义域名', placeholder: 'https://cdn.example.com', description: 'CDN 或反向代理域名，为空则使用 Endpoint' },
+      { key: 'is_private', label: '私有 Bucket', type: 'switch', description: '开启后图片访问需经过服务器代理（防盗链）' },
     ],
   },
   webdav: {
@@ -249,6 +250,9 @@ export default function StorageConfigs() {
           {field.label}
           {field.required && <span className="text-red-500 ml-1">*</span>}
         </Label>
+        {field.description && (
+          <p className="text-xs text-slate-500">{field.description}</p>
+        )}
         {field.type === 'switch' ? (
           <Switch
             id={field.key}
