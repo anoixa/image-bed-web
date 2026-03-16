@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { UploadCloud, X, FileImage, Loader2, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

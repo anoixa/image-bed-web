@@ -155,14 +155,9 @@ export default function ImageCard({
     }
   };
 
-  // 计算图片的宽高比，用于预留空间防止跳动
-  const aspectRatio = image.width && image.height
-    ? (image.height / image.width) * 100
-    : 75; // 默认4:3比例
-
   return (
     <div
-      className={`relative break-inside-avoid mb-4 rounded-xl overflow-hidden bg-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 ${selectable ? 'cursor-default' : 'cursor-pointer'}`}
+      className={`relative h-64 flex flex-col rounded-xl overflow-hidden bg-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 ${selectable ? 'cursor-default' : 'cursor-pointer'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       style={{ contain: 'layout style paint' }}
@@ -180,11 +175,8 @@ export default function ImageCard({
         </div>
       )}
       
-      {/* 骨架屏占位 - 使用padding-bottom撑开高度 */}
-      <div
-        className="relative w-full"
-        style={{ paddingBottom: `${aspectRatio}%` }}
-      >
+      {/* 固定高度的图片区域 - 等高布局 */}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
         {!imageLoaded && (
           <div className="absolute inset-0 bg-slate-200 animate-pulse" />
         )}
@@ -203,27 +195,15 @@ export default function ImageCard({
 
         {/* Hover Overlay - 平滑淡入遮罩层 */}
         <div
-          className={`absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/60 to-transparent flex flex-col justify-between p-4 transition-opacity duration-300 pointer-events-none ${
+          className={`absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/40 to-transparent flex items-center justify-center transition-opacity duration-300 pointer-events-none ${
             isHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {/* Top: Filename + Zoom hint */}
-          <div className="flex items-start justify-between pointer-events-auto">
-            <p 
-              className="text-white text-sm font-medium truncate drop-shadow-md flex-1 mr-2" 
-              title={image.filename}
-            >
-              {image.filename}
-            </p>
-            <Maximize2 className="w-4 h-4 text-white/70 flex-shrink-0" />
-          </div>
-
-          {/* Bottom: Action Buttons */}
-          <div className="flex items-center justify-center gap-2 pointer-events-auto">
+          <div className="flex items-center gap-1.5 pointer-events-auto">
             <Button
               variant="ghost"
               size="icon"
-              className="w-9 h-9 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
+              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
               onClick={handleCopy}
               title="复制链接"
             >
@@ -234,7 +214,7 @@ export default function ImageCard({
             <Button
               variant="ghost"
               size="icon"
-              className={`w-9 h-9 rounded-full backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110 ${
+              className={`w-8 h-8 rounded-full backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110 ${
                 currentVisibility === 'public'
                   ? 'bg-emerald-500/60 hover:bg-emerald-500/80 text-white'
                   : 'bg-slate-500/60 hover:bg-slate-500/80 text-white'
@@ -255,7 +235,7 @@ export default function ImageCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-9 h-9 rounded-full bg-indigo-500/60 hover:bg-indigo-500/80 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
+                className="w-8 h-8 rounded-full bg-indigo-500/60 hover:bg-indigo-500/80 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
                 onClick={handleAddToAlbum}
                 title="添加到相册"
               >
@@ -268,7 +248,7 @@ export default function ImageCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-9 h-9 rounded-full bg-amber-500/60 hover:bg-amber-500/80 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
+                className="w-8 h-8 rounded-full bg-amber-500/60 hover:bg-amber-500/80 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
                 onClick={handleRemoveFromAlbum}
                 disabled={isRemoving}
                 title="从相册移除"
@@ -280,13 +260,29 @@ export default function ImageCard({
             <Button
               variant="ghost"
               size="icon"
-              className="w-9 h-9 rounded-full bg-red-500/60 hover:bg-red-500/80 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
+              className="w-8 h-8 rounded-full bg-red-500/60 hover:bg-red-500/80 text-white backdrop-blur-sm border-0 transition-all duration-200 hover:scale-110"
               onClick={handleDelete}
               title="删除"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+      </div>
+
+      {/* 底部信息区域 - 固定高度 */}
+      <div className="h-16 p-3 bg-white flex flex-col justify-between flex-shrink-0">
+        <p
+          className="text-sm font-medium text-slate-700 truncate"
+          title={image.filename}
+        >
+          {image.filename}
+        </p>
+        <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
+          <span>{new Date(image.created_at).toLocaleDateString('zh-CN')}</span>
+          <span className={`px-1.5 py-0.5 rounded ${image.visibility === 'public' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+            {image.visibility === 'public' ? '公开' : '私有'}
+          </span>
         </div>
       </div>
 

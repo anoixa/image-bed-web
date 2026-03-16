@@ -820,11 +820,12 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         maskClosable={true}
         pullClosable={true}
       >
-        <div className="columns-2 lg:columns-4 gap-4 space-y-4">
+        {/* 等高网格布局：使用 CSS Grid 替代 Masonry */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
           {images.map((image, index) => (
             <div
               key={image.id}
-              className="animate-fade-in-up"
+              className="animate-fade-in-up h-full"
               style={{
                 animationDelay: `${(index % 8) * 50}ms`,
                 animationFillMode: 'both',
