@@ -52,8 +52,7 @@ interface ConfigField {
 const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
   local: {
     fields: [
-      { key: 'base_path', label: '基础路径', placeholder: '/data/images', required: true, description: '服务器上存储图片的本地路径' },
-      { key: 'base_url', label: '基础URL', placeholder: 'https://example.com/images', required: true, description: '访问图片的URL前缀，需配合Nginx等反向代理' },
+      { key: 'local_path', label: '本地路径', placeholder: './data/uploads', required: true, description: '服务器上存储图片的本地路径' },
     ],
   },
   s3: {
@@ -70,10 +69,10 @@ const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
   },
   webdav: {
     fields: [
-      { key: 'url', label: 'WebDAV URL', placeholder: 'https://webdav.example.com', required: true },
-      { key: 'username', label: '用户名', required: true },
-      { key: 'password', label: '密码', type: 'password', required: true },
-      { key: 'base_url', label: '访问URL前缀', placeholder: 'https://cdn.example.com', required: true },
+      { key: 'webdav_url', label: 'WebDAV URL', placeholder: 'https://nas.example.com/webdav', required: true },
+      { key: 'webdav_username', label: '用户名', required: true },
+      { key: 'webdav_password', label: '密码', type: 'password', required: true },
+      { key: 'webdav_root_path', label: '根路径', placeholder: '/images', description: 'WebDAV 服务器上的根路径' },
     ],
   },
 };
