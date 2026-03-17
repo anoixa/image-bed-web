@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Loader2, ImageIcon, FolderOpen, Filter, X, CheckSquare, Square, FolderMinus, FolderPlus, Trash2, ArrowUpDown, Eye, EyeOff } from 'lucide-react';
 import { PhotoProvider } from 'react-photo-view';
 import type { Image, Album } from '@/types';
@@ -123,17 +123,17 @@ export default function JustifiedGallery({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [isWidthReady, setIsWidthReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // 使用 ResizeObserver 获取容器宽度
-  const containerRef = (node: HTMLDivElement | null) => {
+  useEffect(() => {
+    const node = containerRef.current;
     if (!node) return;
     
     const updateWidth = () => {
       const width = node.clientWidth;
       if (width > 0) {
         setContainerWidth(width);
-        setIsWidthReady(true);
       }
     };
     
@@ -143,7 +143,7 @@ export default function JustifiedGallery({
     observer.observe(node);
     
     return () => observer.disconnect();
-  };
+  }, []);
 
   // 将图片分组到行
   const rows = useMemo(() => {
@@ -246,8 +246,8 @@ export default function JustifiedGallery({
     );
   }
 
-  // 宽度未测量完成时显示 loading
-  if (!isWidthReady) {
+  // 宽度未确定时显示 loading（但图片已加载时继续渲染）
+  if (containerWidth === 0 && images.length === 0 && !loading) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col items-center justify-center py-20">

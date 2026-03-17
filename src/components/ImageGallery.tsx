@@ -37,6 +37,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
   const [images, setImages] = useState<Image[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [, setPagination] = useState<PaginatedResponse<Image> | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +142,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
       setPagination(response);
       setCurrentPage(page);
+      setHasLoaded(true);
 
       const totalPages = Math.ceil(total / perPage);
       setHasMore(page < totalPages && items.length > 0);
@@ -156,6 +158,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       }
     } finally {
       setLoading(false);
+      setHasLoaded(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibilityFilter, albumFilter, sortBy, sortOrder, effectiveAlbumId, searchQuery]);
@@ -403,7 +406,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     );
   }
 
-  if (images.length === 0) {
+  if (images.length === 0 && hasLoaded) {
     return (
       <div className="space-y-8">
         {/* Header */}
