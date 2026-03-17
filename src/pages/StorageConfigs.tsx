@@ -24,6 +24,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useStorageConfigsStore } from '@/store/storageConfigs';
 
 type StorageType = 'local' | 's3' | 'webdav';
 
@@ -80,6 +81,9 @@ const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
 export default function StorageConfigs() {
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // 全局存储配置 store，用于同步右上角下拉菜单
+  const { refreshStorageConfigs } = useStorageConfigsStore();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -139,6 +143,8 @@ export default function StorageConfigs() {
       setIsCreateOpen(false);
       resetForm();
       loadData();
+      // 同步刷新全局 store，更新右上角下拉菜单
+      await refreshStorageConfigs();
     } catch (error) {
       toast({
         title: '创建失败',
@@ -161,6 +167,8 @@ export default function StorageConfigs() {
       setEditingId(null);
       resetForm();
       loadData();
+      // 同步刷新全局 store，更新右上角下拉菜单
+      await refreshStorageConfigs();
     } catch (error) {
       toast({
         title: '更新失败',
@@ -181,6 +189,8 @@ export default function StorageConfigs() {
           await deleteStorageConfig(id);
           toast({ title: '删除成功', description: '存储配置已删除' });
           loadData();
+          // 同步刷新全局 store，更新右上角下拉菜单
+          await refreshStorageConfigs();
         } catch (error) {
           toast({
             title: '删除失败',
@@ -198,6 +208,8 @@ export default function StorageConfigs() {
       await setDefaultStorageConfig(id);
       toast({ title: '设置成功', description: '已设为默认存储' });
       loadData();
+      // 同步刷新全局 store，更新右上角下拉菜单
+      await refreshStorageConfigs();
     } catch (error) {
       toast({
         title: '设置失败',

@@ -24,8 +24,9 @@ import {
   Cloud,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
-import { fetchStorageConfigs, setDefaultStorageConfig } from '@/api/configs';
+import { setDefaultStorageConfig } from '@/api/configs';
 import type { StorageConfig } from '@/types';
+import { useStorageConfigsStore } from '@/store/storageConfigs';
 import {
   Dialog,
   DialogContent,
@@ -148,8 +149,8 @@ export default function DashboardLayout() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
-  // 存储配置列表
-  const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
+  // 从全局 store 获取存储配置列表
+  const { storageConfigs, loadStorageConfigs, refreshStorageConfigs } = useStorageConfigsStore();
 
   // 获取存储类型图标
   const getStorageIcon = (type?: string) => {
@@ -167,13 +168,8 @@ export default function DashboardLayout() {
 
   // 加载存储配置
   useEffect(() => {
-    fetchStorageConfigs()
-      .then((configs) => {
-        const filtered = configs.filter(c => c.category === 'storage' && c.is_enabled);
-        setStorageConfigs(filtered);
-      })
-      .catch(console.error);
-  }, []);
+    loadStorageConfigs();
+  }, [loadStorageConfigs]);
 
   const handleLogout = async () => {
     await logout();
@@ -401,9 +397,7 @@ export default function DashboardLayout() {
                             try {
                               await setDefaultStorageConfig(config.id);
                               // 刷新存储配置列表
-                              const configs = await fetchStorageConfigs();
-                              const filteredConfigs = (configs as StorageConfig[]).filter((c: StorageConfig) => c.category === 'storage');
-                              setStorageConfigs(filteredConfigs);
+                              await refreshStorageConfigs();
                               toast({
                                 title: '设置成功',
                                 description: `${config.name} 已设为默认存储`,

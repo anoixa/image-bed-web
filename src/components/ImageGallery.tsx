@@ -573,6 +573,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       {/* List Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2 flex-wrap">
+          <ImageIcon className="w-6 h-6 text-indigo-600" />
           <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
           {currentAlbum && (
             <Link
