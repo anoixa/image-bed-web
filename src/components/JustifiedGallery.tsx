@@ -122,14 +122,19 @@ export default function JustifiedGallery({
 }: JustifiedGalleryProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(1200);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isWidthReady, setIsWidthReady] = useState(false);
 
   // 使用 ResizeObserver 获取容器宽度
   const containerRef = (node: HTMLDivElement | null) => {
     if (!node) return;
     
     const updateWidth = () => {
-      setContainerWidth(node.clientWidth);
+      const width = node.clientWidth;
+      if (width > 0) {
+        setContainerWidth(width);
+        setIsWidthReady(true);
+      }
     };
     
     updateWidth();
@@ -237,6 +242,17 @@ export default function JustifiedGallery({
         <h3 className="text-lg font-medium text-slate-800 mb-2">加载失败</h3>
         <p className="text-slate-500 mb-6">{error}</p>
         <Button onClick={() => window.location.reload()}>重新加载</Button>
+      </div>
+    );
+  }
+
+  // 宽度未测量完成时显示 loading
+  if (!isWidthReady) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col items-center justify-center py-20">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
       </div>
     );
   }
