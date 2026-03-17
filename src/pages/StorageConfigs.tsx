@@ -34,12 +34,6 @@ interface StorageFormData {
   is_default: boolean;
 }
 
-const STORAGE_TYPES: { type: StorageType; label: string; icon: typeof Server }[] = [
-  { type: 'local', label: '本地存储', icon: HardDrive },
-  { type: 's3', label: 'S3 存储', icon: Cloud },
-  { type: 'webdav', label: 'WebDAV', icon: Server },
-];
-
 interface ConfigField {
   key: string;
   label: string;
@@ -48,6 +42,12 @@ interface ConfigField {
   required?: boolean;
   description?: string;
 }
+
+const STORAGE_TYPES: { type: StorageType; label: string; icon: typeof Server }[] = [
+  { type: 'local', label: '本地存储', icon: HardDrive },
+  { type: 's3', label: 'S3 存储', icon: Cloud },
+  { type: 'webdav', label: 'WebDAV', icon: Server },
+];
 
 const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
   local: {
@@ -76,6 +76,143 @@ const STORAGE_TYPE_CONFIGS: Record<StorageType, { fields: ConfigField[] }> = {
     ],
   },
 };
+
+interface ConfigFieldsProps {
+  type: StorageType;
+  config: Record<string, string>;
+  onConfigChange: (key: string, value: string) => void;
+}
+
+// 独立的配置字段渲染组件 - 避免在父组件内定义导致重渲染问题
+function ConfigFields({ type, config, onConfigChange }: ConfigFieldsProps) {
+  const typeConfig = STORAGE_TYPE_CONFIGS[type];
+  return (
+    <>
+      {typeConfig.fields.map((field) => (
+        <div key={field.key} className="space-y-2">
+          <Label htmlFor={field.key}>
+            {field.label}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+          {field.description && (
+            <p className="text-xs text-slate-500">{field.description}</p>
+          )}
+          {field.type === 'switch' ? (
+            <Switch
+              id={field.key}
+              checked={config[field.key] === 'true'}
+              onCheckedChange={(checked: boolean) =>
+                onConfigChange(field.key, String(checked))
+              }
+            />
+          ) : (
+            <Input
+              id={field.key}
+              type={field.type || 'text'}
+              placeholder={field.placeholder}
+              value={config[field.key] || ''}
+              onChange={(e) => onConfigChange(field.key, e.target.value)}
+            />
+          )}
+        </div>
+      ))}
+    </>
+  );
+}
+
+interface StorageTypeSelectorProps {
+  selectedType: StorageType;
+  onTypeChange: (type: StorageType) => void;
+}
+
+// 独立的存储类型选择组件
+function StorageTypeSelector({ selectedType, onTypeChange }: StorageTypeSelectorProps) {
+  return (
+    <div className="space-y-2">
+      <Label>存储类型</Label>
+      <div className="grid grid-cols-3 gap-3">
+        {STORAGE_TYPES.map(({ type, label, icon: Icon }) => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => onTypeChange(type)}
+            className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
+              selectedType === type
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <Icon className="w-6 h-6" />
+            <span className="text-sm font-medium">{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface StorageFormProps {
+  formData: StorageFormData;
+  selectedType: StorageType;
+  isEditing: boolean;
+  onNameChange: (name: string) => void;
+  onTypeChange: (type: StorageType) => void;
+  onConfigChange: (key: string, value: string) => void;
+  onIsDefaultChange: (isDefault: boolean) => void;
+}
+
+// 独立的表单组件 - 避免在父组件内定义导致重渲染问题
+function StorageForm({
+  formData,
+  selectedType,
+  isEditing,
+  onNameChange,
+  onTypeChange,
+  onConfigChange,
+  onIsDefaultChange,
+}: StorageFormProps) {
+  return (
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">
+          配置名称
+          <span className="text-red-500 ml-1">*</span>
+        </Label>
+        <Input
+          id="name"
+          placeholder="例如：本地存储、MinIO主存储"
+          value={formData.name}
+          onChange={(e) => onNameChange(e.target.value)}
+        />
+      </div>
+
+      {!isEditing && (
+        <StorageTypeSelector
+          selectedType={selectedType}
+          onTypeChange={onTypeChange}
+        />
+      )}
+
+      <div className="space-y-4">
+        <Label>配置参数</Label>
+        <ConfigFields
+          type={isEditing ? (formData.config.type as StorageType) || 'local' : selectedType}
+          config={formData.config}
+          onConfigChange={onConfigChange}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 pt-2">
+        <Switch
+          id="is_default"
+          checked={formData.is_default}
+          onCheckedChange={onIsDefaultChange}
+        />
+        <Label htmlFor="is_default">设为默认存储</Label>
+      </div>
+    </div>
+  );
+}
 
 export default function StorageConfigs() {
   const [storageConfigs, setStorageConfigs] = useState<StorageConfig[]>([]);
@@ -234,13 +371,17 @@ export default function StorageConfigs() {
     }
   };
 
-  const openEditDialog = (config: StorageConfig) => {
+  const handleEdit = (config: StorageConfig) => {
     setEditingId(config.id);
     setFormData({
       name: config.name,
-      config: { ...config.config } as Record<string, string>,
+      config: config.config as Record<string, string>,
       is_default: config.is_default,
     });
+    const storageType = (config.config as Record<string, string>)?.type as StorageType;
+    if (storageType) {
+      setSelectedType(storageType);
+    }
     setIsEditOpen(true);
   };
 
@@ -253,289 +394,226 @@ export default function StorageConfigs() {
     setSelectedType('local');
   };
 
-  const renderConfigFields = (type: StorageType, isEditing: boolean) => {
-    const config = STORAGE_TYPE_CONFIGS[type];
-    return config.fields.map((field) => (
-      <div key={field.key} className="space-y-2">
-        <Label htmlFor={field.key}>
-          {field.label}
-          {field.required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-        {field.description && (
-          <p className="text-xs text-slate-500">{field.description}</p>
-        )}
-        {field.type === 'switch' ? (
-          <Switch
-            id={field.key}
-            checked={formData.config[field.key] === 'true'}
-            onCheckedChange={(checked: boolean) =>
-              setFormData(prev => ({
-                ...prev,
-                config: { ...prev.config, [field.key]: String(checked) },
-              }))
-            }
-          />
-        ) : (
-          <Input
-            id={field.key}
-            type={field.type || 'text'}
-            placeholder={field.placeholder}
-            value={formData.config[field.key] || ''}
-            onChange={(e) =>
-              setFormData(prev => ({
-                ...prev,
-                config: { ...prev.config, [field.key]: e.target.value },
-              }))
-            }
-          />
-        )}
-      </div>
-    ));
+  // 表单事件处理函数
+  const handleNameChange = useCallback((name: string) => {
+    setFormData(prev => ({ ...prev, name }));
+  }, []);
+
+  const handleTypeChange = useCallback((type: StorageType) => {
+    setSelectedType(type);
+    // 切换类型时清空配置
+    setFormData(prev => ({ ...prev, config: { type } }));
+  }, []);
+
+  const handleConfigChange = useCallback((key: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      config: { ...prev.config, [key]: value },
+    }));
+  }, []);
+
+  const handleIsDefaultChange = useCallback((isDefault: boolean) => {
+    setFormData(prev => ({ ...prev, is_default: isDefault }));
+  }, []);
+
+  const getStorageIcon = (type?: string) => {
+    switch (type) {
+      case 's3':
+        return <Cloud className="h-5 w-5 text-slate-500" />;
+      case 'local':
+        return <HardDrive className="h-5 w-5 text-slate-500" />;
+      case 'webdav':
+        return <Database className="h-5 w-5 text-slate-500" />;
+      default:
+        return <Database className="h-5 w-5 text-slate-500" />;
+    }
   };
-
-  const StorageForm = ({ isEditing }: { isEditing: boolean }) => (
-    <div className="space-y-4 py-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">
-          配置名称
-          <span className="text-red-500 ml-1">*</span>
-        </Label>
-        <Input
-          id="name"
-          placeholder="例如：本地存储、MinIO主存储"
-          value={formData.name}
-          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-        />
-      </div>
-
-      {!isEditing && (
-        <div className="space-y-2">
-          <Label>存储类型</Label>
-          <div className="grid grid-cols-3 gap-3">
-            {STORAGE_TYPES.map(({ type, label, icon: Icon }) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setSelectedType(type)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                  selectedType === type
-                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <Icon className="w-6 h-6" />
-                <span className="text-sm font-medium">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <Label>配置参数</Label>
-        {renderConfigFields(isEditing ? (formData.config.type as StorageType) || 'local' : selectedType, isEditing)}
-      </div>
-
-      <div className="flex items-center gap-2 pt-2">
-        <Switch
-          id="is_default"
-          checked={formData.is_default}
-          onCheckedChange={(checked: boolean) =>
-            setFormData(prev => ({ ...prev, is_default: checked }))
-          }
-        />
-        <Label htmlFor="is_default">设为默认存储</Label>
-      </div>
-    </div>
-  );
-
-  const getConfigType = (config: Record<string, unknown>): StorageType => {
-    return (config.type as StorageType) || 'local';
-  };
-
-  const getConfigValue = (config: Record<string, unknown>, key: string): string => {
-    const value = config[key];
-    return typeof value === 'string' ? value : '';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Database className="w-6 h-6 text-indigo-600" />
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <Database className="h-6 w-6 text-indigo-600" />
             存储配置
           </h1>
           <p className="text-slate-500 mt-1">管理图片存储后端（本地、S3、WebDAV）</p>
         </div>
+        
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              添加存储
+            <Button className="bg-indigo-600 hover:bg-indigo-700">
+              <Plus className="mr-2 h-4 w-4" />
+              新建配置
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>添加存储配置</DialogTitle>
+              <DialogTitle>创建存储配置</DialogTitle>
             </DialogHeader>
-            <StorageForm isEditing={false} />
+            <StorageForm
+              formData={formData}
+              selectedType={selectedType}
+              isEditing={false}
+              onNameChange={handleNameChange}
+              onTypeChange={handleTypeChange}
+              onConfigChange={handleConfigChange}
+              onIsDefaultChange={handleIsDefaultChange}
+            />
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsCreateOpen(false);
+                resetForm();
+              }}>
                 取消
               </Button>
-              <Button onClick={handleCreate}>创建</Button>
+              <Button 
+                onClick={handleCreate}
+                className="bg-indigo-600 hover:bg-indigo-700"
+                disabled={!formData.name}
+              >
+                创建
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Storage Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {storageConfigs.map((config) => {
-          const configType = getConfigType(config.config);
-          const typeInfo = STORAGE_TYPES.find(t => t.type === configType);
-          const Icon = typeInfo?.icon || Database;
-          
-          return (
-            <Card key={config.id} className={config.is_default ? 'ring-2 ring-indigo-500' : ''}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      config.is_default ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">{config.name}</CardTitle>
-                      <p className="text-xs text-slate-500">{typeInfo?.label}</p>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+        </div>
+      ) : storageConfigs.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Database className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-slate-900 mb-2">暂无存储配置</h3>
+          <p className="text-slate-500 mb-4">点击上方按钮创建第一个存储配置</p>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {storageConfigs.map((config) => {
+            const storageType = (config.config as Record<string, string>)?.type;
+            return (
+              <Card key={config.id} className={config.is_default ? 'ring-2 ring-indigo-500' : ''}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        {getStorageIcon(storageType)}
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{config.name}</CardTitle>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-500 capitalize">{storageType}</span>
+                          {config.is_default && (
+                            <Badge variant="default" className="bg-indigo-600 text-xs">默认</Badge>
+                          )}
+                          {config.is_enabled ? (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-600">启用</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-slate-400">禁用</Badge>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  {config.is_default && (
-                    <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100">
-                      <Star className="w-3 h-3 mr-1" />
-                      默认
-                    </Badge>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0 flex flex-col">
-                <div className="text-sm text-slate-600 space-y-1 flex-1 min-h-[44px]">
-                  {getConfigValue(config.config, 'base_url') && (
-                    <p className="truncate" title={getConfigValue(config.config, 'base_url')}>
-                      URL: {getConfigValue(config.config, 'base_url')}
-                    </p>
-                  )}
-                  {getConfigValue(config.config, 'endpoint') && (
-                    <p className="truncate" title={getConfigValue(config.config, 'endpoint')}>
-                      Endpoint: {getConfigValue(config.config, 'endpoint')}
-                    </p>
-                  )}
-                  {getConfigValue(config.config, 'bucket_name') && (
-                    <p>Bucket: {getConfigValue(config.config, 'bucket_name')}</p>
-                  )}
-                  {getConfigValue(config.config, 'public_domain') && (
-                    <p className="truncate" title={getConfigValue(config.config, 'public_domain')}>
-                      Domain: {getConfigValue(config.config, 'public_domain')}
-                    </p>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2 mt-4 h-9">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 h-9"
-                    onClick={() => openEditDialog(config)}
-                  >
-                    <Pencil className="w-4 h-4 mr-1" />
-                    编辑
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 h-9"
-                    onClick={() => handleTest(config.id)}
-                    disabled={testingId === config.id}
-                  >
-                    {testingId === config.id ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <TestTube className="w-4 h-4 mr-1" />
-                    )}
-                    测试
-                  </Button>
-                  {config.is_default ? (
-                    <div className="w-9 h-9" />
-                  ) : (
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm text-slate-600">
+                    <p>创建于: {new Date(config.created_at).toLocaleDateString()}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-9 w-9 p-0"
-                      onClick={() => handleSetDefault(config.id)}
+                      onClick={() => handleEdit(config)}
                     >
-                      <Star className="w-4 h-4" />
+                      <Pencil className="h-4 w-4 mr-1" />
+                      编辑
                     </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50 h-9 w-9 p-0"
-                    onClick={() => handleDelete(config.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Empty State */}
-      {storageConfigs.length === 0 && (
-        <div className="text-center py-16">
-          <Database className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-800 mb-2">暂无存储配置</h3>
-          <p className="text-slate-500 mb-4">点击上方按钮添加第一个存储配置</p>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTest(config.id)}
+                      disabled={testingId === config.id}
+                    >
+                      {testingId === config.id ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <TestTube className="h-4 w-4 mr-1" />
+                      )}
+                      测试
+                    </Button>
+                    
+                    {!config.is_default && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSetDefault(config.id)}
+                      >
+                        <Star className="h-4 w-4 mr-1" />
+                        设为默认
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto"
+                      onClick={() => handleDelete(config.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* Edit Dialog */}
+      {/* 编辑弹窗 */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>编辑存储配置</DialogTitle>
           </DialogHeader>
-          <StorageForm isEditing={true} />
+          <StorageForm
+            formData={formData}
+            selectedType={selectedType}
+            isEditing={true}
+            onNameChange={handleNameChange}
+            onTypeChange={handleTypeChange}
+            onConfigChange={handleConfigChange}
+            onIsDefaultChange={handleIsDefaultChange}
+          />
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+            <Button variant="outline" onClick={() => {
+              setIsEditOpen(false);
+              setEditingId(null);
+              resetForm();
+            }}>
               取消
             </Button>
-            <Button onClick={handleUpdate}>保存</Button>
+            <Button 
+              onClick={handleUpdate}
+              className="bg-indigo-600 hover:bg-indigo-700"
+              disabled={!formData.name}
+            >
+              保存
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Dialog */}
       <ConfirmDialog
         open={confirmDialog.open}
         onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, open }))}
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        confirmText="确认"
-        cancelText="取消"
         variant={confirmDialog.variant}
       />
     </div>
