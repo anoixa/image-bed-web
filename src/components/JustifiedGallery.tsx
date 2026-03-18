@@ -36,6 +36,7 @@ interface JustifiedGalleryProps {
   onAddToAlbum?: (identifier: string) => void;
   onBatchDelete?: () => void;
   onBatchRemoveFromAlbum?: () => void;
+  onBatchAddToAlbum?: (identifiers: string[]) => void;
   onSelectImage?: (identifier: string, selected: boolean) => void;
   onSelectAll?: () => void;
   onExitBatchMode?: () => void;
@@ -111,6 +112,7 @@ export default function JustifiedGallery({
   onAddToAlbum,
   onBatchDelete,
   onBatchRemoveFromAlbum,
+  onBatchAddToAlbum,
   onSelectImage,
   onSelectAll,
   onExitBatchMode,
@@ -126,6 +128,7 @@ export default function JustifiedGallery({
 }: JustifiedGalleryProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [showAddToAlbumConfirm, setShowAddToAlbumConfirm] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hasMeasuredRef = useRef(false);
@@ -304,6 +307,16 @@ export default function JustifiedGallery({
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={onExitBatchMode} className="border-indigo-300 text-indigo-700 hover:bg-indigo-100">
                 取消
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddToAlbumConfirm(true)}
+                disabled={selectedImages.size === 0}
+                className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-100"
+              >
+                <FolderPlus className="h-4 w-4" />
+                添加到相册
               </Button>
               {effectiveAlbumId && (
                 <Button

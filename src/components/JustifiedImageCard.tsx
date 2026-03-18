@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { PhotoView } from 'react-photo-view';
 import { Link2, Trash2, FolderPlus } from 'lucide-react';
 import type { Image } from '@/types';
@@ -16,7 +16,7 @@ interface JustifiedImageCardProps {
   onSelect?: (identifier: string, selected: boolean) => void;
 }
 
-export default function JustifiedImageCard({
+const JustifiedImageCard = memo(function JustifiedImageCard({
   image,
   style,
   onDelete,
@@ -113,33 +113,27 @@ export default function JustifiedImageCard({
         <div className="absolute inset-0 bg-slate-200 animate-pulse" />
       )}
 
-      {/* 图片 - 使用 PhotoView 实现点击查看大图 */}
-      {/* 图片 - 常规模式下可预览，批量模式下点击选择 */}
-      {selectable ? (
+      {/* 图片 - 使用稳定的 key 避免重新加载 */}
+      <PhotoView src={originalUrl}>
         <img
           src={thumbnailUrl}
           alt={image.filename}
-          className={`w-full h-full object-cover transition-all duration-300 cursor-pointer ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
+          className={`w-full h-full object-cover transition-all duration-300 ${
+            selectable ? 'cursor-pointer' : 'cursor-zoom-in'
+          } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           onLoad={() => setImageLoaded(true)}
-          onClick={handleSelect}
           loading="lazy"
           decoding="async"
+          style={{ pointerEvents: selectable ? 'none' : 'auto' }}
         />
-      ) : (
-        <PhotoView src={originalUrl}>
-          <img
-            src={thumbnailUrl}
-            alt={image.filename}
-            className={`w-full h-full object-cover transition-all duration-300 cursor-zoom-in ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onLoad={() => setImageLoaded(true)}
-            loading="lazy"
-            decoding="async"
-          />
-        </PhotoView>
+      </PhotoView>
+      
+      {/* 批量模式下覆盖透明点击层用于选择 */}
+      {selectable && (
+        <div
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={handleSelect}
+        />
       )}
 
       {/* 底部渐变遮罩层 - 始终显示，确保文字可读 */}
@@ -155,45 +149,47 @@ export default function JustifiedImageCard({
         </p>
       </div>
 
-      {/* 悬停时的操作按钮层 */}
-      <div
-        className={`absolute inset-0 p-3 transition-opacity duration-300 z-10 ${
-          isHovered && !selectable ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        {/* 顶部：操作按钮 */}
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-1.5">
+      {/* 悬停时的操作按钮层 - 批量模式下不显示 */}
+      {!selectable && (
+        <div
+          className={`absolute inset-0 p-3 transition-opacity duration-300 z-10 ${
+            isHovered ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {/* 顶部：操作按钮 */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
+                onClick={handleCopy}
+                title="复制链接"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
+                onClick={handleAddToAlbum}
+                title="添加到相册"
+              >
+                <FolderPlus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
             <Button
               variant="ghost"
               size="icon"
-              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
-              onClick={handleCopy}
-              title="复制链接"
+              className="w-7 h-7 rounded-full bg-red-500/60 hover:bg-red-500/80 text-white backdrop-blur-sm border-0"
+              onClick={handleDelete}
+              title="删除"
             >
-              <Link2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
-              onClick={handleAddToAlbum}
-              title="添加到相册"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="w-7 h-7 rounded-full bg-red-500/60 hover:bg-red-500/80 text-white backdrop-blur-sm border-0"
-            onClick={handleDelete}
-            title="删除"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
         </div>
-      </div>
+      )}
 
       {/* 选中状态的半透明遮罩 */}
       {selected && selectable && (
@@ -201,4 +197,6 @@ export default function JustifiedImageCard({
       )}
     </div>
   );
-}
+});
+
+export default JustifiedImageCard;

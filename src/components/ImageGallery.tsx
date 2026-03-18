@@ -292,6 +292,13 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     setIsAlbumModalOpen(true);
   };
 
+  // 批量添加到相册
+  const handleBatchAddToAlbum = () => {
+    if (selectedImages.size === 0) return;
+    setCurrentImageForAlbum(null); // 清空单张图片，使用选中的多张
+    setIsAlbumModalOpen(true);
+  };
+
   // 关闭相册弹窗
   const closeAlbumModal = () => {
     setIsAlbumModalOpen(false);
@@ -659,6 +666,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         onAddToAlbum={handleAddToAlbum}
         onBatchDelete={handleBatchDelete}
         onBatchRemoveFromAlbum={handleBatchRemoveFromAlbum}
+        onBatchAddToAlbum={handleBatchAddToAlbum}
         onSelectImage={handleSelectImage}
         onSelectAll={handleSelectAll}
         onExitBatchMode={exitBatchMode}
@@ -677,7 +685,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       <AlbumSelectModal
         open={isAlbumModalOpen}
         onOpenChange={closeAlbumModal}
-        imageIdentifiers={currentImageForAlbum ? [currentImageForAlbum] : []}
+        imageIdentifiers={currentImageForAlbum ? [currentImageForAlbum] : Array.from(selectedImages)}
         onSuccess={closeAlbumModal}
       />
 
