@@ -279,7 +279,7 @@ export default function ImageCard({
           {image.filename}
         </p>
         <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
-          <span>{new Date(image.created_at).toLocaleDateString('zh-CN')}</span>
+          <span>{new Date(image.created_at * 1000).toLocaleDateString('zh-CN')}</span>
           <span className={`px-1.5 py-0.5 rounded ${image.visibility === 'public' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
             {image.visibility === 'public' ? '公开' : '私有'}
           </span>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PhotoView } from 'react-photo-view';
-import { Link2, Trash2, FolderPlus, Eye, EyeOff, Check } from 'lucide-react';
+import { Link2, Trash2, FolderPlus, Check } from 'lucide-react';
 import type { Image } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -69,9 +69,9 @@ export default function JustifiedImageCard({
     onSelect?.(image.identifier, !selected);
   };
 
-  // 格式化日期
   const formatDate = (dateValue: string | number) => {
-    const date = new Date(dateValue);
+    const timestamp = typeof dateValue === 'number' ? dateValue * 1000 : dateValue;
+    const date = new Date(timestamp);
     return date.toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
@@ -118,19 +118,11 @@ export default function JustifiedImageCard({
         />
       </PhotoView>
 
-      {/* 渐变遮罩层 - 从下到上的黑色渐变 */}
-      <div
-        className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none transition-opacity duration-300 ${
-          isHovered || selectable ? 'opacity-100' : 'opacity-0'
-        }`}
-      />
+      {/* 底部渐变遮罩层 - 始终显示，确保文字可读 */}
+      <div className="absolute bottom-0 left-0 right-0 h-[30%] bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none" />
 
-      {/* 默认状态的信息显示（左下角） */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 p-3 pointer-events-none transition-opacity duration-300 ${
-          isHovered || selectable ? 'opacity-0' : 'opacity-100'
-        }`}
-      >
+      {/* 信息显示（左下角） */}
+      <div className="absolute bottom-0 left-0 right-0 p-3 pointer-events-none">
         <p className="text-white text-xs font-medium truncate drop-shadow-md" title={image.filename}>
           {image.filename}
         </p>
@@ -141,7 +133,7 @@ export default function JustifiedImageCard({
 
       {/* 悬停时的操作按钮层 */}
       <div
-        className={`absolute inset-0 flex flex-col justify-between p-3 transition-opacity duration-300 ${
+        className={`absolute inset-0 p-3 transition-opacity duration-300 ${
           isHovered && !selectable ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -151,7 +143,7 @@ export default function JustifiedImageCard({
             <Button
               variant="ghost"
               size="icon"
-              className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm border-0"
+              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
               onClick={handleCopy}
               title="复制链接"
             >
@@ -160,7 +152,7 @@ export default function JustifiedImageCard({
             <Button
               variant="ghost"
               size="icon"
-              className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/40 text-white backdrop-blur-sm border-0"
+              className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
               title="添加到相册"
             >
               <FolderPlus className="h-3.5 w-3.5" />
@@ -175,29 +167,6 @@ export default function JustifiedImageCard({
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
-        </div>
-
-        {/* 底部：文件名和日期（悬停时显示在遮罩层上方） */}
-        <div className="pointer-events-none">
-          <p className="text-white text-xs font-medium truncate drop-shadow-md" title={image.filename}>
-            {image.filename}
-          </p>
-          <div className="flex items-center gap-2 mt-0.5">
-            <p className="text-white/80 text-[10px]">
-              {formatDate(image.created_at)}
-            </p>
-            {image.visibility === 'public' ? (
-              <span className="text-[10px] text-emerald-300 flex items-center gap-0.5">
-                <Eye className="w-3 h-3" />
-                公开
-              </span>
-            ) : (
-              <span className="text-[10px] text-slate-300 flex items-center gap-0.5">
-                <EyeOff className="w-3 h-3" />
-                私有
-              </span>
-            )}
-          </div>
         </div>
       </div>
 

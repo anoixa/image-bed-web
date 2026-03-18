@@ -55,7 +55,9 @@ const GAP = 10;
 
 // 将图片分组到行中
 function groupImagesIntoRows(images: Image[], containerWidth: number): Image[][] {
-  if (!containerWidth || images.length === 0) return [];
+  // 如果还没有获取到容器宽度，使用一个默认的最小宽度来避免闪烁
+  const effectiveWidth = containerWidth > 0 ? containerWidth : 800;
+  if (images.length === 0) return [];
 
   const rows: Image[][] = [];
   let currentRow: Image[] = [];
@@ -66,7 +68,7 @@ function groupImagesIntoRows(images: Image[], containerWidth: number): Image[][]
     const imageWidth = ROW_HEIGHT * aspectRatio;
 
     // 如果当前行加上这张图片会超出容器宽度（且当前行已有图片）
-    const wouldExceed = currentRowWidth + imageWidth + (currentRow.length > 0 ? GAP : 0) > containerWidth;
+    const wouldExceed = currentRowWidth + imageWidth + (currentRow.length > 0 ? GAP : 0) > effectiveWidth;
     
     if (wouldExceed && currentRow.length > 0) {
       // 保存当前行，开始新行
@@ -124,26 +126,35 @@ export default function JustifiedGallery({
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const hasMeasuredRef = useRef(false);
 
   // 使用 ResizeObserver 获取容器宽度
   useEffect(() => {
     const node = containerRef.current;
-    if (!node) return;
+    if (!node || hasMeasuredRef.current) return;
     
     const updateWidth = () => {
-      const width = node.clientWidth;
+      const rect = node.getBoundingClientRect();
+      const width = rect.width;
       if (width > 0) {
         setContainerWidth(width);
+        hasMeasuredRef.current = true;
       }
     };
     
+    // 立即测量一次
     updateWidth();
+    
+    // 如果还没获取到，延迟再试一次（确保 DOM 已渲染）
+    if (containerWidth === 0) {
+      requestAnimationFrame(updateWidth);
+    }
     
     const observer = new ResizeObserver(updateWidth);
     observer.observe(node);
     
     return () => observer.disconnect();
-  }, []);
+  }, [images.length]); // 当图片数量变化时重新测量
 
   // 将图片分组到行
   const rows = useMemo(() => {
@@ -242,17 +253,6 @@ export default function JustifiedGallery({
         <h3 className="text-lg font-medium text-slate-800 mb-2">加载失败</h3>
         <p className="text-slate-500 mb-6">{error}</p>
         <Button onClick={() => window.location.reload()}>重新加载</Button>
-      </div>
-    );
-  }
-
-  // 宽度未确定时显示 loading（但图片已加载时继续渲染）
-  if (containerWidth === 0 && images.length === 0 && !loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-        </div>
       </div>
     );
   }

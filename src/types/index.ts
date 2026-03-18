@@ -93,8 +93,8 @@ export interface Token {
   hash: string;
   prefix: string;
   description?: string;
-  last_used_at?: string;
-  created_at: string;
+  last_used_at?: number;
+  created_at: number;
 }
 
 // 创建Token请求
@@ -265,8 +265,8 @@ export interface StorageConfig {
   is_default: boolean;
   is_enabled: boolean;
   config: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
+  created_at: number;
+  updated_at: number;
   description?: string;
   priority?: number;
   // 前端兼容字段

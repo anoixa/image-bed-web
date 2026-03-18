@@ -36,7 +36,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const searchQuery = searchParams.get('search') || undefined;
 
   const [images, setImages] = useState<Image[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [, setPagination] = useState<PaginatedResponse<Image> | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -374,15 +374,23 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         ? `相册: ${getAlbumLabel()}`
         : `${images.length} 张图片`));
 
-  if (loading && images.length === 0) {
+  if (!hasLoaded) {
     return (
       <PhotoProvider>
         <div className="space-y-8">
+          {/* Header Skeleton */}
+          <div className="mb-8">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-6 h-6 bg-slate-300 rounded animate-pulse" />
+              <div className="w-32 h-8 bg-slate-300 rounded animate-pulse" />
+            </div>
+            <div className="w-48 h-4 bg-slate-300 rounded animate-pulse" />
+          </div>
           {/* Masonry Skeleton */}
           <div className="columns-2 lg:columns-4 gap-4 space-y-4">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="break-inside-avoid mb-4 rounded-xl overflow-hidden bg-slate-200">
-                <Skeleton className="w-full h-48" />
+              <div key={i} className="break-inside-avoid mb-4 rounded-xl overflow-hidden bg-slate-300">
+                <Skeleton className="w-full h-48 bg-slate-300" />
               </div>
             ))}
           </div>

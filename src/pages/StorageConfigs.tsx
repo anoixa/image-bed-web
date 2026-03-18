@@ -520,7 +520,7 @@ export default function StorageConfigs() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 text-sm text-slate-600">
-                    <p>创建于: {new Date(config.created_at).toLocaleDateString()}</p>
+                    <p>创建于: {new Date((config.created_at ?? 0) * 1000).toLocaleDateString()}</p>
                   </div>
                   
                   <div className="flex items-center gap-2 mt-4 pt-4 border-t">

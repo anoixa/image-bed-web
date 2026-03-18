@@ -139,7 +139,8 @@ export default function Tokens() {
 
   const formatDate = (dateString: string | number | undefined) => {
     if (!dateString) return '-';
-    const date = new Date(dateString);
+    const timestamp = typeof dateString === 'number' ? dateString * 1000 : dateString;
+    const date = new Date(timestamp);
     return date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',

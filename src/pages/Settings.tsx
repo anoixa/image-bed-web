@@ -64,7 +64,7 @@ export default function Settings() {
   const [transferMode, setTransferMode] = useState<TransferMode>('auto');
   const [isUpdatingTransferMode, setIsUpdatingTransferMode] = useState(false);
 
-  // 存储配置表单 - category 固定为 'storage'，存储类型放在 config.type 中
+  // 存储配置表单
   const [newStorage, setNewStorage] = useState<{
     name: string;
     config: {
@@ -405,9 +405,10 @@ export default function Settings() {
     }
   };
 
-  const formatDate = (dateString: string | undefined) => {
+  const formatDate = (dateString: string | number | undefined) => {
     if (!dateString) return '-';
-    const date = new Date(dateString);
+    const timestamp = typeof dateString === 'number' ? dateString * 1000 : dateString;
+    const date = new Date(timestamp);
     return date.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
