@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PhotoView } from 'react-photo-view';
-import { Link2, Trash2, FolderPlus, Check } from 'lucide-react';
+import { Link2, Trash2, FolderPlus } from 'lucide-react';
 import type { Image } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,6 +10,7 @@ interface JustifiedImageCardProps {
   image: Image;
   style: React.CSSProperties;
   onDelete?: (identifier: string) => void;
+  onAddToAlbum?: (identifier: string) => void;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (identifier: string, selected: boolean) => void;
@@ -19,6 +20,7 @@ export default function JustifiedImageCard({
   image,
   style,
   onDelete,
+  onAddToAlbum,
   selectable = false,
   selected = false,
   onSelect,
@@ -69,6 +71,12 @@ export default function JustifiedImageCard({
     onSelect?.(image.identifier, !selected);
   };
 
+  const handleAddToAlbum = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onAddToAlbum?.(image.identifier);
+  };
+
   const formatDate = (dateValue: string | number) => {
     const timestamp = typeof dateValue === 'number' ? dateValue * 1000 : dateValue;
     const date = new Date(timestamp);
@@ -89,8 +97,9 @@ export default function JustifiedImageCard({
       {/* 批量选择复选框 */}
       {selectable && (
         <div
-          className="absolute top-2 left-2 z-20"
+          className="absolute top-2 left-2 z-30"
           onClick={handleSelect}
+          onMouseDown={(e) => e.stopPropagation()}
         >
           <Checkbox
             checked={selected}
@@ -105,18 +114,33 @@ export default function JustifiedImageCard({
       )}
 
       {/* 图片 - 使用 PhotoView 实现点击查看大图 */}
-      <PhotoView src={originalUrl}>
+      {/* 图片 - 常规模式下可预览，批量模式下点击选择 */}
+      {selectable ? (
         <img
           src={thumbnailUrl}
           alt={image.filename}
-          className={`w-full h-full object-cover transition-all duration-300 cursor-zoom-in ${
+          className={`w-full h-full object-cover transition-all duration-300 cursor-pointer ${
             imageLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           onLoad={() => setImageLoaded(true)}
+          onClick={handleSelect}
           loading="lazy"
           decoding="async"
         />
-      </PhotoView>
+      ) : (
+        <PhotoView src={originalUrl}>
+          <img
+            src={thumbnailUrl}
+            alt={image.filename}
+            className={`w-full h-full object-cover transition-all duration-300 cursor-zoom-in ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            loading="lazy"
+            decoding="async"
+          />
+        </PhotoView>
+      )}
 
       {/* 底部渐变遮罩层 - 始终显示，确保文字可读 */}
       <div className="absolute bottom-0 left-0 right-0 h-[30%] bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none" />
@@ -133,12 +157,12 @@ export default function JustifiedImageCard({
 
       {/* 悬停时的操作按钮层 */}
       <div
-        className={`absolute inset-0 p-3 transition-opacity duration-300 ${
+        className={`absolute inset-0 p-3 transition-opacity duration-300 z-10 ${
           isHovered && !selectable ? 'opacity-100' : 'opacity-0'
         }`}
       >
         {/* 顶部：操作按钮 */}
-        <div className="flex items-start justify-between pointer-events-auto">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-1.5">
             <Button
               variant="ghost"
@@ -153,6 +177,7 @@ export default function JustifiedImageCard({
               variant="ghost"
               size="icon"
               className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
+              onClick={handleAddToAlbum}
               title="添加到相册"
             >
               <FolderPlus className="h-3.5 w-3.5" />
@@ -170,13 +195,9 @@ export default function JustifiedImageCard({
         </div>
       </div>
 
-      {/* 选中状态的勾选标记 */}
-      {selected && (
-        <div className="absolute inset-0 bg-indigo-500/20 pointer-events-none">
-          <div className="absolute top-2 right-2 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center">
-            <Check className="w-4 h-4 text-white" />
-          </div>
-        </div>
+      {/* 选中状态的半透明遮罩 */}
+      {selected && selectable && (
+        <div className="absolute inset-0 bg-indigo-500/10 pointer-events-none" />
       )}
     </div>
   );

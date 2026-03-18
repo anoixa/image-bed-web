@@ -412,17 +412,17 @@ export default function DashboardLayout() {
                           }}
                           className="cursor-pointer"
                         >
-                          <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-between w-full gap-3">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               {getStorageIcon(storageType)}
                               <span className="truncate">{config.name}</span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
                               {config.is_default && (
-                                <Badge variant="secondary" className="text-xs">默认</Badge>
+                                <Badge variant="secondary" className="text-xs whitespace-nowrap">默认</Badge>
                               )}
                               {config.is_default && (
-                                <Check className="h-4 w-4 text-indigo-600" />
+                                <Check className="h-4 w-4 text-indigo-600 shrink-0" />
                               )}
                             </div>
                           </div>

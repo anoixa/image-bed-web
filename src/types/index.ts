@@ -265,8 +265,8 @@ export interface StorageConfig {
   is_default: boolean;
   is_enabled: boolean;
   config: Record<string, unknown>;
-  created_at: number;
-  updated_at: number;
+  created_at: string;
+  updated_at: string;
   description?: string;
   priority?: number;
   // 前端兼容字段

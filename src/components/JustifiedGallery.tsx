@@ -33,6 +33,7 @@ interface JustifiedGalleryProps {
   selectedImages?: Set<string>;
   onLoadMore?: () => void;
   onDelete?: (identifier: string) => void;
+  onAddToAlbum?: (identifier: string) => void;
   onBatchDelete?: () => void;
   onBatchRemoveFromAlbum?: () => void;
   onSelectImage?: (identifier: string, selected: boolean) => void;
@@ -107,6 +108,7 @@ export default function JustifiedGallery({
   selectedImages = new Set(),
   onLoadMore,
   onDelete,
+  onAddToAlbum,
   onBatchDelete,
   onBatchRemoveFromAlbum,
   onSelectImage,
@@ -464,6 +466,7 @@ export default function JustifiedGallery({
                   image={image}
                   style={getImageStyle(image, row)}
                   onDelete={onDelete}
+                  onAddToAlbum={onAddToAlbum}
                   selectable={isBatchMode}
                   selected={selectedImages.has(image.identifier)}
                   onSelect={onSelectImage}

@@ -66,6 +66,10 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
+  // 相册选择弹窗状态
+  const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
+  const [currentImageForAlbum, setCurrentImageForAlbum] = useState<string | null>(null);
+
   // 加载相册列表
   useEffect(() => {
     fetchAlbums()
@@ -280,6 +284,18 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const exitBatchMode = () => {
     setIsBatchMode(false);
     setSelectedImages(new Set());
+  };
+
+  // 打开添加图片到相册的弹窗
+  const handleAddToAlbum = (identifier: string) => {
+    setCurrentImageForAlbum(identifier);
+    setIsAlbumModalOpen(true);
+  };
+
+  // 关闭相册弹窗
+  const closeAlbumModal = () => {
+    setIsAlbumModalOpen(false);
+    setCurrentImageForAlbum(null);
   };
 
   // 批量删除
@@ -640,6 +656,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         selectedImages={selectedImages}
         onLoadMore={() => loadImages(currentPage + 1, true)}
         onDelete={handleDelete}
+        onAddToAlbum={handleAddToAlbum}
         onBatchDelete={handleBatchDelete}
         onBatchRemoveFromAlbum={handleBatchRemoveFromAlbum}
         onSelectImage={handleSelectImage}
@@ -654,6 +671,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         setIsBatchMode={setIsBatchMode}
         effectiveAlbumId={effectiveAlbumId}
         loaderRef={loaderRef}
+      />
+
+      {/* 相册选择弹窗 */}
+      <AlbumSelectModal
+        open={isAlbumModalOpen}
+        onOpenChange={closeAlbumModal}
+        imageIdentifiers={currentImageForAlbum ? [currentImageForAlbum] : []}
+        onSuccess={closeAlbumModal}
       />
 
     </div>
