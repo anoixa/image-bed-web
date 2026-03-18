@@ -68,9 +68,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200/60">
       <div className="p-6 flex items-center gap-3">
-        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
-          <ImageIcon className="w-5 h-5 text-white" />
-        </div>
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="12" width="20" height="20" rx="6" fill="#E2E8F0" />
+          <rect x="11" y="9" width="20" height="20" rx="6" fill="#94A3B8" />
+          <rect x="14" y="6" width="20" height="20" rx="7" fill="url(#paint0_linear)" />
+          <circle cx="24" cy="16" r="3" fill="white" fillOpacity="0.8" />
+          <defs>
+            <linearGradient id="paint0_linear" x1="14" y1="6" x2="34" y2="26" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#6366F1" />
+              <stop offset="1" stopColor="#4F46E5" />
+            </linearGradient>
+          </defs>
+        </svg>
         <span className="text-xl font-bold text-slate-800 tracking-tight">Image Bed</span>
       </div>
 

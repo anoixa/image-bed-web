@@ -96,7 +96,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
     >
       {/* 批量选择复选框 */}
       {selectable && (
-        <div className="absolute top-2 left-2 z-30">
+        <div className="absolute top-2 left-2 z-30" onClick={(e) => e.stopPropagation()}>
           <Checkbox
             checked={selected}
             onCheckedChange={(checked) => onSelect?.(image.identifier, checked === true)}
@@ -110,33 +110,31 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
         <div className="absolute inset-0 bg-slate-200 animate-pulse" />
       )}
 
-      {/* 图片 - 常规模式可预览，批量模式禁用 */}
-      {selectable ? (
-        <img
-          src={thumbnailUrl}
-          alt={image.filename}
-          className={`w-full h-full object-cover transition-all duration-300 cursor-pointer ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          onLoad={() => setImageLoaded(true)}
-          onClick={handleSelect}
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
+      {/* 图片 - 使用 key 防止重新加载 */}
+      <div className="w-full h-full relative">
         <PhotoView src={originalUrl}>
           <img
+            key={`img-${image.identifier}`}
             src={thumbnailUrl}
             alt={image.filename}
-            className={`w-full h-full object-cover transition-all duration-300 cursor-zoom-in ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={`w-full h-full object-cover transition-all duration-300 ${
+              selectable ? 'cursor-pointer' : 'cursor-zoom-in'
+            } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             onLoad={() => setImageLoaded(true)}
             loading="lazy"
             decoding="async"
+            style={{ pointerEvents: selectable ? 'none' : 'auto' }}
           />
         </PhotoView>
-      )}
+        
+        {/* 批量模式下覆盖层处理选择 */}
+        {selectable && (
+          <div
+            className="absolute inset-0 z-10 cursor-pointer"
+            onClick={handleSelect}
+          />
+        )}
+      </div>
 
       {/* 底部渐变遮罩层 - 始终显示，确保文字可读 */}
       <div className="absolute bottom-0 left-0 right-0 h-[30%] bg-gradient-to-t from-black/70 via-black/30 to-transparent pointer-events-none" />
