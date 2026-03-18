@@ -96,13 +96,10 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
     >
       {/* 批量选择复选框 */}
       {selectable && (
-        <div
-          className="absolute top-2 left-2 z-30"
-          onClick={handleSelect}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
+        <div className="absolute top-2 left-2 z-30">
           <Checkbox
             checked={selected}
+            onCheckedChange={(checked) => onSelect?.(image.identifier, checked === true)}
             className={`w-5 h-5 border-2 ${selected ? 'bg-indigo-500 border-indigo-500' : 'bg-white/80 border-white/50'}`}
           />
         </div>
@@ -157,7 +154,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
       {/* 悬停时的操作按钮层 - 批量模式下不显示 */}
       {!selectable && (
         <div
-          className={`absolute inset-0 p-3 transition-opacity duration-300 z-10 ${
+          className={`absolute inset-0 p-3 transition-opacity duration-300 z-10 pointer-events-none ${
             isHovered ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -167,7 +164,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
+                className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0 pointer-events-auto"
                 onClick={handleCopy}
                 title="复制链接"
               >
@@ -176,7 +173,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0"
+                className="w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm border-0 pointer-events-auto"
                 onClick={handleAddToAlbum}
                 title="添加到相册"
               >
@@ -186,7 +183,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
             <Button
               variant="ghost"
               size="icon"
-              className="w-7 h-7 rounded-full bg-red-500/60 hover:bg-red-500/80 text-white backdrop-blur-sm border-0"
+              className="w-7 h-7 rounded-full bg-red-500/60 hover:bg-red-500/80 text-white backdrop-blur-sm border-0 pointer-events-auto"
               onClick={handleDelete}
               title="删除"
             >
