@@ -113,27 +113,32 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
         <div className="absolute inset-0 bg-slate-200 animate-pulse" />
       )}
 
-      {/* 图片 - 使用稳定的 key 避免重新加载 */}
-      <PhotoView src={originalUrl}>
+      {/* 图片 - 常规模式可预览，批量模式禁用 */}
+      {selectable ? (
         <img
           src={thumbnailUrl}
           alt={image.filename}
-          className={`w-full h-full object-cover transition-all duration-300 ${
-            selectable ? 'cursor-pointer' : 'cursor-zoom-in'
-          } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`w-full h-full object-cover transition-all duration-300 cursor-pointer ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
           onLoad={() => setImageLoaded(true)}
+          onClick={handleSelect}
           loading="lazy"
           decoding="async"
-          style={{ pointerEvents: selectable ? 'none' : 'auto' }}
         />
-      </PhotoView>
-      
-      {/* 批量模式下覆盖透明点击层用于选择 */}
-      {selectable && (
-        <div
-          className="absolute inset-0 z-10 cursor-pointer"
-          onClick={handleSelect}
-        />
+      ) : (
+        <PhotoView src={originalUrl}>
+          <img
+            src={thumbnailUrl}
+            alt={image.filename}
+            className={`w-full h-full object-cover transition-all duration-300 cursor-zoom-in ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            loading="lazy"
+            decoding="async"
+          />
+        </PhotoView>
       )}
 
       {/* 底部渐变遮罩层 - 始终显示，确保文字可读 */}
