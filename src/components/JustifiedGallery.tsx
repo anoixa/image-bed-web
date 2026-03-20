@@ -311,7 +311,7 @@ export default function JustifiedGallery({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowAddToAlbumConfirm(true)}
+                onClick={() => onBatchAddToAlbum?.(Array.from(selectedImages))}
                 disabled={selectedImages.size === 0}
                 className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-100"
               >

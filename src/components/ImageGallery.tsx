@@ -167,20 +167,21 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibilityFilter, albumFilter, sortBy, sortOrder, effectiveAlbumId, searchQuery]);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        wasHidden.current = true;
-      } else if (document.visibilityState === 'visible' && wasHidden.current) {
-        wasHidden.current = false;
-        if (images.length > 0) {
-          loadImages(1, false);
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [loadImages, images.length]);
+
+  // useEffect(() => {
+  //   const handleVisibilityChange = () => {
+  //     if (document.visibilityState === 'hidden') {
+  //       wasHidden.current = true;
+  //     } else if (document.visibilityState === 'visible' && wasHidden.current) {
+  //       wasHidden.current = false;
+  //       if (images.length > 0) {
+  //         loadImages(1, false);
+  //       }
+  //     }
+  //   };
+  //   document.addEventListener('visibilitychange', handleVisibilityChange);
+  //   return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  // }, [loadImages, images.length]);
 
   // 监听外部刷新事件（如上传成功后）
   useEffect(() => {
