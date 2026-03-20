@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ImageIcon,
   Folder,
@@ -64,6 +64,35 @@ const navItems: NavItem[] = [
   { path: '/settings', label: '系统设置', icon: Settings },
 ];
 
+// 导航项链接组件 - 保留 URL 查询参数
+function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+  const Icon = item.icon;
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  const to = {
+    pathname: item.path,
+    search: location.pathname === item.path ? location.search : undefined,
+  };
+
+  return (
+    <NavLink
+      to={to}
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+          isActive
+            ? 'bg-indigo-50 text-indigo-600'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        }`
+      }
+    >
+      <Icon className="w-5 h-5" />
+      {item.label}
+    </NavLink>
+  );
+}
+
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200/60">
@@ -87,21 +116,11 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         {navItems.map((item) => {
           const Icon = item.icon;
           return (
-            <NavLink
+            <NavItemLink
               key={item.path}
-              to={item.path}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`
-              }
-            >
-              <Icon className="w-5 h-5" />
-              {item.label}
-            </NavLink>
+              item={item}
+              onNavigate={onNavigate}
+            />
           );
         })}
       </nav>

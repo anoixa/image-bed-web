@@ -47,7 +47,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
   // 筛选状态
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
-  const [albumFilter, setAlbumFilter] = useState<number | 'all'>('all');
+  const [albumFilter, setAlbumFilter] = useState<number | 'all'>(effectiveAlbumId ?? 'all');
   const [sortBy, setSortBy] = useState<'created_at' | 'file_size'>('created_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -191,6 +191,15 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     window.addEventListener('images:refresh', handleRefresh);
     return () => window.removeEventListener('images:refresh', handleRefresh);
   }, [loadImages]);
+
+  // 监听 URL 中的 album_id 变化，更新筛选状态
+  useEffect(() => {
+    if (effectiveAlbumId) {
+      setAlbumFilter(effectiveAlbumId);
+    } else {
+      setAlbumFilter('all');
+    }
+  }, [effectiveAlbumId]);
 
   useEffect(() => {
     if (!hasInitialized.current) {
