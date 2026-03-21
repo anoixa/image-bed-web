@@ -67,7 +67,9 @@ export default function Settings() {
 
   // 转换配置
   const [conversionConfig, setConversionConfig] = useState<ConversionConfig | null>(null);
+  const [editingConfig, setEditingConfig] = useState<ConversionConfig | null>(null);
   const [isUpdatingConversion, setIsUpdatingConversion] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // 存储配置表单
   const [newStorage, setNewStorage] = useState<{
@@ -149,6 +151,8 @@ export default function Settings() {
       // 处理转换配置数据
       if (conversionConfigResult.status === 'fulfilled') {
         setConversionConfig(conversionConfigResult.value);
+        setEditingConfig(conversionConfigResult.value);
+        setHasChanges(false);
       } else {
         console.error('加载转换配置失败:', conversionConfigResult.reason);
       }
@@ -350,24 +354,49 @@ export default function Settings() {
     }
   };
 
-  // 转换配置管理
-  const handleUpdateConversion = async <K extends keyof ConversionConfig>(
+  const handleEditConfig = <K extends keyof ConversionConfig>(
     key: K,
     value: ConversionConfig[K]
   ) => {
-    if (!conversionConfig) return;
+    if (!editingConfig) return;
+    setEditingConfig({ ...editingConfig, [key]: value });
+    setHasChanges(true);
+  };
+
+  // WebP 开关本地编辑
+  const handleWebPToggle = (enabled: boolean) => {
+    if (!editingConfig) return;
+    const formats = enabled
+      ? [...editingConfig.conversion_enabled_formats, 'webp']
+      : editingConfig.conversion_enabled_formats.filter(f => f !== 'webp');
+    handleEditConfig('conversion_enabled_formats', formats);
+  };
+
+  // AVIF 开关本地编辑
+  const handleAVIFToggle = (enabled: boolean) => {
+    if (!editingConfig) return;
+    const formats = enabled
+      ? [...editingConfig.conversion_enabled_formats, 'avif']
+      : editingConfig.conversion_enabled_formats.filter(f => f !== 'avif');
+    handleEditConfig('conversion_enabled_formats', formats);
+  };
+
+  // 保存配置到服务器
+  const handleSaveConfig = async () => {
+    if (!editingConfig) return;
 
     setIsUpdatingConversion(true);
     try {
-      await updateConversionConfig({ [key]: value });
-      setConversionConfig((prev) => prev ? { ...prev, [key]: value } : null);
+      await updateConversionConfig(editingConfig);
+      setConversionConfig(editingConfig);
+      setHasChanges(false);
       toast({
-        title: '更新成功',
+        title: '保存成功',
         description: '设置已保存',
       });
     } catch (error) {
       toast({
-        title: '更新失败',
+        title: '保存失败',
         description: error instanceof Error ? error.message : '请稍后重试',
         variant: 'destructive',
       });
@@ -376,22 +405,12 @@ export default function Settings() {
     }
   };
 
-  // WebP 开关处理（通过 conversion_enabled_formats 数组控制）
-  const handleWebPToggle = async (enabled: boolean) => {
-    if (!conversionConfig) return;
-    const formats = enabled
-      ? [...conversionConfig.conversion_enabled_formats, 'webp']
-      : conversionConfig.conversion_enabled_formats.filter(f => f !== 'webp');
-    await handleUpdateConversion('conversion_enabled_formats', formats);
-  };
-
-  // AVIF 开关处理
-  const handleAVIFToggle = async (enabled: boolean) => {
-    if (!conversionConfig) return;
-    const formats = enabled
-      ? [...conversionConfig.conversion_enabled_formats, 'avif']
-      : conversionConfig.conversion_enabled_formats.filter(f => f !== 'avif');
-    await handleUpdateConversion('conversion_enabled_formats', formats);
+  // 重置配置
+  const handleResetConfig = () => {
+    if (conversionConfig) {
+      setEditingConfig(conversionConfig);
+      setHasChanges(false);
+    }
   };
 
   const getCategoryIcon = (category: string) => {
@@ -476,8 +495,33 @@ export default function Settings() {
 
         {/* 通用设置 */}
         <TabsContent value="general" className="space-y-6">
-          {conversionConfig ? (
+          {editingConfig ? (
             <>
+              {/* 操作按钮 */}
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleResetConfig}
+                  disabled={!hasChanges || isUpdatingConversion}
+                >
+                  重置
+                </Button>
+                <Button
+                  onClick={handleSaveConfig}
+                  disabled={!hasChanges || isUpdatingConversion}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {isUpdatingConversion ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      保存中...
+                    </>
+                  ) : (
+                    '保存设置'
+                  )}
+                </Button>
+              </div>
+
               {/* 上传设置卡片 */}
               <Card>
                 <CardHeader>
@@ -494,9 +538,8 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">关闭后上传接口将不需要 Token 认证</p>
                     </div>
                     <Switch
-                      checked={conversionConfig.api_key_enabled}
-                      onCheckedChange={(checked) => handleUpdateConversion('api_key_enabled', checked)}
-                      disabled={isUpdatingConversion}
+                      checked={editingConfig.api_key_enabled}
+                      onCheckedChange={(checked) => handleEditConfig('api_key_enabled', checked)}
                     />
                   </div>
                   <div className="border-t border-slate-200" />
@@ -508,9 +551,8 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">新上传图片的默认访问权限</p>
                     </div>
                     <select
-                      value={conversionConfig.default_visibility}
-                      onChange={(e) => handleUpdateConversion('default_visibility', e.target.value as 'public' | 'private')}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.default_visibility}
+                      onChange={(e) => handleEditConfig('default_visibility', e.target.value as 'public' | 'private')}
                       className="h-9 px-3 rounded-md border border-input bg-background text-sm"
                     >
                       <option value="public">公开</option>
@@ -523,15 +565,14 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">批量上传并发数</label>
-                      <span className="text-sm text-slate-500">{conversionConfig.concurrent_upload_limit}</span>
+                      <span className="text-sm text-slate-500">{editingConfig.concurrent_upload_limit}</span>
                     </div>
                     <input
                       type="range"
                       min={1}
                       max={10}
-                      value={conversionConfig.concurrent_upload_limit}
-                      onChange={(e) => handleUpdateConversion('concurrent_upload_limit', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.concurrent_upload_limit}
+                      onChange={(e) => handleEditConfig('concurrent_upload_limit', parseInt(e.target.value))}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">范围：1-10，建议值：3-5</p>
@@ -545,9 +586,8 @@ export default function Settings() {
                       type="number"
                       min={1}
                       max={500}
-                      value={conversionConfig.max_file_size_mb}
-                      onChange={(e) => handleUpdateConversion('max_file_size_mb', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.max_file_size_mb}
+                      onChange={(e) => handleEditConfig('max_file_size_mb', parseInt(e.target.value))}
                       className="w-32"
                     />
                     <p className="text-xs text-slate-500">范围：1-500 MB</p>
@@ -558,9 +598,8 @@ export default function Settings() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">默认上传相册</label>
                     <select
-                      value={conversionConfig.default_album_id}
-                      onChange={(e) => handleUpdateConversion('default_album_id', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.default_album_id}
+                      onChange={(e) => handleEditConfig('default_album_id', parseInt(e.target.value))}
                       className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
                     >
                       <option value={0}>不指定（使用上次选择的相册）</option>
@@ -591,9 +630,8 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">上传后自动生成缩略图</p>
                     </div>
                     <Switch
-                      checked={conversionConfig.thumbnail_enabled}
-                      onCheckedChange={(checked) => handleUpdateConversion('thumbnail_enabled', checked)}
-                      disabled={isUpdatingConversion}
+                      checked={editingConfig.thumbnail_enabled}
+                      onCheckedChange={(checked) => handleEditConfig('thumbnail_enabled', checked)}
                     />
                   </div>
                   <div className="border-t border-slate-200" />
@@ -602,15 +640,14 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">缩略图质量</label>
-                      <span className="text-sm text-slate-500">{conversionConfig.thumbnail_quality}%</span>
+                      <span className="text-sm text-slate-500">{editingConfig.thumbnail_quality}%</span>
                     </div>
                     <input
                       type="range"
                       min={1}
                       max={100}
-                      value={conversionConfig.thumbnail_quality}
-                      onChange={(e) => handleUpdateConversion('thumbnail_quality', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.thumbnail_quality}
+                      onChange={(e) => handleEditConfig('thumbnail_quality', parseInt(e.target.value))}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">范围：1-100，建议值：80-90</p>
@@ -624,9 +661,8 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">上传后自动转换为 WebP 格式</p>
                     </div>
                     <Switch
-                      checked={conversionConfig.conversion_enabled_formats.includes('webp')}
+                      checked={editingConfig.conversion_enabled_formats.includes('webp')}
                       onCheckedChange={handleWebPToggle}
-                      disabled={isUpdatingConversion}
                     />
                   </div>
                   <div className="border-t border-slate-200" />
@@ -635,15 +671,14 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">WebP 质量</label>
-                      <span className="text-sm text-slate-500">{conversionConfig.webp_quality}%</span>
+                      <span className="text-sm text-slate-500">{editingConfig.webp_quality}%</span>
                     </div>
                     <input
                       type="range"
                       min={1}
                       max={100}
-                      value={conversionConfig.webp_quality}
-                      onChange={(e) => handleUpdateConversion('webp_quality', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.webp_quality}
+                      onChange={(e) => handleEditConfig('webp_quality', parseInt(e.target.value))}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">范围：1-100，建议值：75-85</p>
@@ -654,15 +689,14 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">WebP 编码 effort</label>
-                      <span className="text-sm text-slate-500">{conversionConfig.webp_effort}</span>
+                      <span className="text-sm text-slate-500">{editingConfig.webp_effort}</span>
                     </div>
                     <input
                       type="range"
                       min={0}
                       max={6}
-                      value={conversionConfig.webp_effort}
-                      onChange={(e) => handleUpdateConversion('webp_effort', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.webp_effort}
+                      onChange={(e) => handleEditConfig('webp_effort', parseInt(e.target.value))}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">0=最快，6=最小文件</p>
@@ -679,9 +713,8 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">上传后同时生成 AVIF 格式（需要更多 CPU）</p>
                     </div>
                     <Switch
-                      checked={conversionConfig.avif_experimental}
-                      onCheckedChange={(checked) => handleUpdateConversion('avif_experimental', checked)}
-                      disabled={isUpdatingConversion}
+                      checked={editingConfig.avif_experimental}
+                      onCheckedChange={(checked) => handleEditConfig('avif_experimental', checked)}
                     />
                   </div>
                   <div className="border-t border-slate-200" />
@@ -690,15 +723,15 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">AVIF 质量</label>
-                      <span className="text-sm text-slate-500">{conversionConfig.avif_quality}%</span>
+                      <span className="text-sm text-slate-500">{editingConfig.avif_quality}%</span>
                     </div>
                     <input
                       type="range"
                       min={1}
                       max={100}
-                      value={conversionConfig.avif_quality}
-                      onChange={(e) => handleUpdateConversion('avif_quality', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion || !conversionConfig.avif_experimental}
+                      value={editingConfig.avif_quality}
+                      onChange={(e) => handleEditConfig('avif_quality', parseInt(e.target.value))}
+                      disabled={!editingConfig.avif_experimental}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">范围：1-100</p>
@@ -709,15 +742,15 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">AVIF 编码速度</label>
-                      <span className="text-sm text-slate-500">{conversionConfig.avif_speed}</span>
+                      <span className="text-sm text-slate-500">{editingConfig.avif_speed}</span>
                     </div>
                     <input
                       type="range"
                       min={0}
                       max={10}
-                      value={conversionConfig.avif_speed}
-                      onChange={(e) => handleUpdateConversion('avif_speed', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion || !conversionConfig.avif_experimental}
+                      value={editingConfig.avif_speed}
+                      onChange={(e) => handleEditConfig('avif_speed', parseInt(e.target.value))}
+                      disabled={!editingConfig.avif_experimental}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">0=最小文件，10=最快</p>
@@ -730,9 +763,8 @@ export default function Settings() {
                     <Input
                       type="number"
                       min={0}
-                      value={conversionConfig.skip_smaller_than}
-                      onChange={(e) => handleUpdateConversion('skip_smaller_than', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.skip_smaller_than}
+                      onChange={(e) => handleEditConfig('skip_smaller_than', parseInt(e.target.value))}
                       className="w-32"
                     />
                     <p className="text-xs text-slate-500">小于此值的图片不转换格式，0=不限制</p>
@@ -745,9 +777,8 @@ export default function Settings() {
                     <Input
                       type="number"
                       min={0}
-                      value={conversionConfig.max_dimension}
-                      onChange={(e) => handleUpdateConversion('max_dimension', parseInt(e.target.value))}
-                      disabled={isUpdatingConversion}
+                      value={editingConfig.max_dimension}
+                      onChange={(e) => handleEditConfig('max_dimension', parseInt(e.target.value))}
                       className="w-32"
                     />
                     <p className="text-xs text-slate-500">超过此尺寸的图片会被缩放，0=无限制</p>
