@@ -1,5 +1,5 @@
 import { get, put } from '@/lib/request';
-import type { SystemInfo, HealthCheck, SystemStatus, SystemSettings, UpdateSettingsRequest } from '@/types';
+import type { SystemInfo, HealthCheck, SystemStatus, ConversionConfig, UpdateConversionRequest } from '@/types';
 
 // 获取版本信息
 export const fetchVersion = (): Promise<SystemInfo> => {
@@ -16,12 +16,12 @@ export const fetchSystemStatus = (): Promise<SystemStatus> => {
   return get('/system/status');
 };
 
-// 获取系统设置 - GET /api/v1/admin/settings
-export const fetchSystemSettings = (): Promise<SystemSettings> => {
-  return get<SystemSettings>('/api/v1/admin/settings');
+// 获取转换配置 - GET /api/v1/admin/conversion
+export const fetchConversionConfig = (): Promise<ConversionConfig> => {
+  return get<ConversionConfig>('/api/v1/admin/conversion');
 };
 
-// 更新系统设置 - PUT /api/v1/admin/settings
-export const updateSystemSettings = (data: UpdateSettingsRequest): Promise<SystemSettings> => {
-  return put<SystemSettings>('/api/v1/admin/settings', data);
+// 更新转换配置 - PUT /api/v1/admin/conversion
+export const updateConversionConfig = (data: UpdateConversionRequest): Promise<{ message: string }> => {
+  return put<{ message: string }>('/api/v1/admin/conversion', data);
 };

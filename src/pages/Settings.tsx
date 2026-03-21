@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { fetchSystemStatus, fetchSystemSettings, updateSystemSettings } from '@/api/system';
+import { fetchSystemStatus, fetchConversionConfig, updateConversionConfig } from '@/api/system';
 import { fetchAlbums } from '@/api/albums';
 import {
   fetchStorageConfigs,
@@ -27,7 +27,7 @@ import {
   fetchRandomSourceAlbum,
   updateRandomSourceAlbum
 } from '@/api/images';
-import type { StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig, SystemSettings } from '@/types';
+import type { StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig, ConversionConfig } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,7 +40,7 @@ export default function Settings() {
   const [isCreateStorageOpen, setIsCreateStorageOpen] = useState(false);
   const [isEditStorageOpen, setIsEditStorageOpen] = useState(false);
   const [editingStorageId, setEditingStorageId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState('transfer');
+  const [activeTab, setActiveTab] = useState('general');
 
   // 确认弹窗状态
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -65,9 +65,9 @@ export default function Settings() {
   const [transferMode, setTransferMode] = useState<TransferMode>('auto');
   const [isUpdatingTransferMode, setIsUpdatingTransferMode] = useState(false);
 
-  // 系统设置
-  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
+  // 转换配置
+  const [conversionConfig, setConversionConfig] = useState<ConversionConfig | null>(null);
+  const [isUpdatingConversion, setIsUpdatingConversion] = useState(false);
 
   // 存储配置表单
   const [newStorage, setNewStorage] = useState<{
@@ -86,14 +86,14 @@ export default function Settings() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // 分别处理每个请求，避免一个失败影响其他请求
-      const [storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult, systemSettingsResult] = await Promise.allSettled([
+
+      const [storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult, conversionConfigResult] = await Promise.allSettled([
         fetchStorageConfigs(),
         fetchAlbums(),
         fetchRandomSourceAlbum(),
         fetchSystemStatus(),
         fetchTransferMode(),
-        fetchSystemSettings(),
+        fetchConversionConfig(),
       ]);
 
       // 处理存储配置数据
@@ -146,11 +146,11 @@ export default function Settings() {
         setTransferMode('auto');
       }
 
-      // 处理系统设置数据
-      if (systemSettingsResult.status === 'fulfilled') {
-        setSystemSettings(systemSettingsResult.value);
+      // 处理转换配置数据
+      if (conversionConfigResult.status === 'fulfilled') {
+        setConversionConfig(conversionConfigResult.value);
       } else {
-        console.error('加载系统设置失败:', systemSettingsResult.reason);
+        console.error('加载转换配置失败:', conversionConfigResult.reason);
       }
     } catch (error) {
       toast({
@@ -169,7 +169,7 @@ export default function Settings() {
 
   // 存储配置管理
   const handleCreateStorage = async () => {
-    if (!newStorage.name.trim()) {
+    if (!newStorage.name) {
       toast({
         title: '请输入配置名称',
         variant: 'destructive',
@@ -177,39 +177,20 @@ export default function Settings() {
       return;
     }
 
-    // 根据存储类型验证必填字段
-    if (newStorage.config.type === 'local' && !newStorage.config.path) {
-      toast({
-        title: '请输入存储路径',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (newStorage.config.type === 'minio') {
-      if (!newStorage.config.endpoint || !newStorage.config.bucket_name ||
-          !newStorage.config.access_key_id || !newStorage.config.secret_access_key) {
-        toast({
-          title: '请填写完整的 MinIO 配置',
-          variant: 'destructive',
-        });
-        return;
-      }
-    }
-
     try {
       await createStorageConfig({
         name: newStorage.name,
         category: 'storage',
         config: newStorage.config,
+        is_enabled: true,
         is_default: newStorage.is_default,
       });
       toast({
         title: '创建成功',
         description: '存储配置已创建',
       });
-      setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
       setIsCreateStorageOpen(false);
+      setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
       loadData();
     } catch (error) {
       toast({
@@ -220,11 +201,42 @@ export default function Settings() {
     }
   };
 
-  const handleDeleteStorage = async (id: number) => {
+  const handleUpdateStorage = async () => {
+    if (!editingStorageId || !newStorage.name) {
+      toast({
+        title: '请输入配置名称',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await updateStorageConfig(editingStorageId, {
+        name: newStorage.name,
+        is_default: newStorage.is_default,
+      });
+      toast({
+        title: '更新成功',
+        description: '存储配置已更新',
+      });
+      setIsEditStorageOpen(false);
+      setEditingStorageId(null);
+      setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
+      loadData();
+    } catch (error) {
+      toast({
+        title: '更新失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteStorage = (id: number) => {
     setConfirmDialog({
       open: true,
-      title: '删除存储配置',
-      description: '确定要删除这个存储配置吗？删除后将无法恢复。',
+      title: '确认删除',
+      description: '确定要删除这个存储配置吗？此操作不可恢复。',
       variant: 'destructive',
       onConfirm: async () => {
         try {
@@ -250,7 +262,7 @@ export default function Settings() {
       await setDefaultStorageConfig(id);
       toast({
         title: '设置成功',
-        description: '默认存储已更新',
+        description: '默认存储配置已更新',
       });
       loadData();
     } catch (error) {
@@ -267,13 +279,13 @@ export default function Settings() {
       const result = await testStorageConfig(id);
       if (result.success) {
         toast({
-          title: '测试成功',
-          description: '存储配置连接正常',
+          title: '连接成功',
+          description: result.message || '存储配置连接正常',
         });
       } else {
         toast({
-          title: '测试失败',
-          description: result.message || '无法连接到存储',
+          title: '连接失败',
+          description: result.message || '无法连接到存储服务',
           variant: 'destructive',
         });
       }
@@ -286,53 +298,14 @@ export default function Settings() {
     }
   };
 
-  // 打开编辑弹窗
-  const handleOpenEditStorage = (config: StorageConfig) => {
+  const openEditStorage = (config: StorageConfig) => {
     setEditingStorageId(config.id);
-    const configType = (config.config as Record<string, string>)?.type || 'local';
     setNewStorage({
       name: config.name,
-      config: {
-        ...(config.config as Record<string, string>),
-        type: configType as 'local' | 'minio' | 'webdav'
-      },
+      config: config.config as { type: 'local' | 'minio' | 'webdav'; [key: string]: string },
       is_default: config.is_default,
     });
     setIsEditStorageOpen(true);
-  };
-
-  // 更新存储配置
-  const handleUpdateStorage = async () => {
-    if (!editingStorageId) return;
-    if (!newStorage.name.trim()) {
-      toast({
-        title: '请输入配置名称',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await updateStorageConfig(editingStorageId, {
-        name: newStorage.name,
-        category: 'storage',
-        config: newStorage.config,
-      });
-      toast({
-        title: '更新成功',
-        description: '存储配置已更新',
-      });
-      setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
-      setIsEditStorageOpen(false);
-      setEditingStorageId(null);
-      loadData();
-    } catch (error) {
-      toast({
-        title: '更新失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    }
   };
 
   // Transfer Mode 管理
@@ -377,17 +350,17 @@ export default function Settings() {
     }
   };
 
-  // 系统设置管理
-  const handleUpdateSetting = async <K extends keyof SystemSettings>(
+  // 转换配置管理
+  const handleUpdateConversion = async <K extends keyof ConversionConfig>(
     key: K,
-    value: SystemSettings[K]
+    value: ConversionConfig[K]
   ) => {
-    if (!systemSettings) return;
+    if (!conversionConfig) return;
 
-    setIsUpdatingSettings(true);
+    setIsUpdatingConversion(true);
     try {
-      const updated = await updateSystemSettings({ [key]: value });
-      setSystemSettings(updated);
+      await updateConversionConfig({ [key]: value });
+      setConversionConfig((prev) => prev ? { ...prev, [key]: value } : null);
       toast({
         title: '更新成功',
         description: '设置已保存',
@@ -399,8 +372,26 @@ export default function Settings() {
         variant: 'destructive',
       });
     } finally {
-      setIsUpdatingSettings(false);
+      setIsUpdatingConversion(false);
     }
+  };
+
+  // WebP 开关处理（通过 conversion_enabled_formats 数组控制）
+  const handleWebPToggle = async (enabled: boolean) => {
+    if (!conversionConfig) return;
+    const formats = enabled
+      ? [...conversionConfig.conversion_enabled_formats, 'webp']
+      : conversionConfig.conversion_enabled_formats.filter(f => f !== 'webp');
+    await handleUpdateConversion('conversion_enabled_formats', formats);
+  };
+
+  // AVIF 开关处理
+  const handleAVIFToggle = async (enabled: boolean) => {
+    if (!conversionConfig) return;
+    const formats = enabled
+      ? [...conversionConfig.conversion_enabled_formats, 'avif']
+      : conversionConfig.conversion_enabled_formats.filter(f => f !== 'avif');
+    await handleUpdateConversion('conversion_enabled_formats', formats);
   };
 
   const getCategoryIcon = (category: string) => {
@@ -485,30 +476,17 @@ export default function Settings() {
 
         {/* 通用设置 */}
         <TabsContent value="general" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings2 className="h-5 w-5" />
-                通用设置
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {systemSettings ? (
-                <>
-                  {/* WebP 转换 */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <label className="text-sm font-medium">自动转换 WebP</label>
-                      <p className="text-xs text-slate-500">上传图片后自动转换为 WebP 格式</p>
-                    </div>
-                    <Switch
-                      checked={systemSettings.webp_enabled}
-                      onCheckedChange={(checked) => handleUpdateSetting('webp_enabled', checked)}
-                      disabled={isUpdatingSettings}
-                    />
-                  </div>
-                  <div className="border-t border-slate-200" />
-
+          {conversionConfig ? (
+            <>
+              {/* 上传设置卡片 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    上传设置
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
                   {/* API Key 认证 */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
@@ -516,9 +494,9 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">关闭后上传接口将不需要 Token 认证</p>
                     </div>
                     <Switch
-                      checked={systemSettings.api_key_enabled}
-                      onCheckedChange={(checked) => handleUpdateSetting('api_key_enabled', checked)}
-                      disabled={isUpdatingSettings}
+                      checked={conversionConfig.api_key_enabled}
+                      onCheckedChange={(checked) => handleUpdateConversion('api_key_enabled', checked)}
+                      disabled={isUpdatingConversion}
                     />
                   </div>
                   <div className="border-t border-slate-200" />
@@ -530,9 +508,9 @@ export default function Settings() {
                       <p className="text-xs text-slate-500">新上传图片的默认访问权限</p>
                     </div>
                     <select
-                      value={systemSettings.default_visibility}
-                      onChange={(e) => handleUpdateSetting('default_visibility', e.target.value as 'public' | 'private')}
-                      disabled={isUpdatingSettings}
+                      value={conversionConfig.default_visibility}
+                      onChange={(e) => handleUpdateConversion('default_visibility', e.target.value as 'public' | 'private')}
+                      disabled={isUpdatingConversion}
                       className="h-9 px-3 rounded-md border border-input bg-background text-sm"
                     >
                       <option value="public">公开</option>
@@ -545,15 +523,15 @@ export default function Settings() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium">批量上传并发数</label>
-                      <span className="text-sm text-slate-500">{systemSettings.concurrent_upload_limit}</span>
+                      <span className="text-sm text-slate-500">{conversionConfig.concurrent_upload_limit}</span>
                     </div>
                     <input
                       type="range"
                       min={1}
                       max={10}
-                      value={systemSettings.concurrent_upload_limit}
-                      onChange={(e) => handleUpdateSetting('concurrent_upload_limit', parseInt(e.target.value))}
-                      disabled={isUpdatingSettings}
+                      value={conversionConfig.concurrent_upload_limit}
+                      onChange={(e) => handleUpdateConversion('concurrent_upload_limit', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">范围：1-10，建议值：3-5</p>
@@ -567,31 +545,12 @@ export default function Settings() {
                       type="number"
                       min={1}
                       max={500}
-                      value={systemSettings.max_file_size_mb}
-                      onChange={(e) => handleUpdateSetting('max_file_size_mb', parseInt(e.target.value))}
-                      disabled={isUpdatingSettings}
+                      value={conversionConfig.max_file_size_mb}
+                      onChange={(e) => handleUpdateConversion('max_file_size_mb', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
                       className="w-32"
                     />
                     <p className="text-xs text-slate-500">范围：1-500 MB</p>
-                  </div>
-                  <div className="border-t border-slate-200" />
-
-                  {/* 图片质量 */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">WebP/缩略图质量</label>
-                      <span className="text-sm text-slate-500">{systemSettings.image_quality}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={1}
-                      max={100}
-                      value={systemSettings.image_quality}
-                      onChange={(e) => handleUpdateSetting('image_quality', parseInt(e.target.value))}
-                      disabled={isUpdatingSettings}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-slate-500">范围：1-100，建议值：80-90</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
@@ -599,9 +558,9 @@ export default function Settings() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">默认上传相册</label>
                     <select
-                      value={systemSettings.default_album_id}
-                      onChange={(e) => handleUpdateSetting('default_album_id', parseInt(e.target.value))}
-                      disabled={isUpdatingSettings}
+                      value={conversionConfig.default_album_id}
+                      onChange={(e) => handleUpdateConversion('default_album_id', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
                       className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
                     >
                       <option value={0}>不指定（使用上次选择的相册）</option>
@@ -613,367 +572,197 @@ export default function Settings() {
                     </select>
                     <p className="text-xs text-slate-500">上传时默认选中的相册，0 表示不指定</p>
                   </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center py-8 text-slate-500">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  加载中...
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardContent>
+              </Card>
 
-        {/* 存储配置 */}
-        <TabsContent value="storage" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  存储配置管理
-                </CardTitle>
-                <Dialog open={isCreateStorageOpen} onOpenChange={setIsCreateStorageOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-indigo-600 hover:bg-indigo-700">
-                      <Plus className="mr-2 h-4 w-4" />
-                      新建配置
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle>新建存储配置</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">配置名称</label>
-                        <Input
-                          value={newStorage.name}
-                          onChange={(e) => setNewStorage({ ...newStorage, name: e.target.value })}
-                          placeholder="例如：本地存储、MinIO主库"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">存储类型</label>
-                        <select
-                          value={newStorage.config.type}
-                          onChange={(e) =>
-                            setNewStorage({
-                              ...newStorage,
-                              config: { type: e.target.value as 'local' | 'minio' | 'webdav' }
-                            })
-                          }
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                        >
-                          <option value="local">本地存储</option>
-                          <option value="minio">MinIO</option>
-                          <option value="webdav">WebDAV</option>
-                        </select>
-                      </div>
-
-                      {/* 配置字段 */}
-                      {newStorage.config.type === 'local' && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">存储路径</label>
-                          <Input
-                            placeholder="/data/uploads"
-                            onChange={(e) =>
-                              setNewStorage({
-                                ...newStorage,
-                                config: { ...newStorage.config, path: e.target.value },
-                              })
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {newStorage.config.type === 'minio' && (
-                        <>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Endpoint</label>
-                            <Input
-                              placeholder="192.168.10.3:9000"
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, endpoint: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Bucket</label>
-                            <Input
-                              placeholder="image-pre"
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, bucket_name: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Access Key ID</label>
-                            <Input
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, access_key_id: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Secret Access Key</label>
-                            <Input
-                              type="password"
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, secret_access_key: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id="minio-ssl"
-                              checked={newStorage.config.use_ssl === 'true'}
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, use_ssl: String(e.target.checked) },
-                                })
-                              }
-                              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <label htmlFor="minio-ssl" className="text-sm text-slate-700">
-                              使用 SSL/TLS (HTTPS)
-                            </label>
-                          </div>
-
-                          {/* Direct Link 配置 */}
-                          <div className="border-t pt-4 mt-4">
-                            <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-                              <Link2 className="h-4 w-4" />
-                              直链访问配置
-                            </h4>
-
-                            <div className="space-y-4">
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  id="minio-enable-direct-link"
-                                  checked={newStorage.config.enable_direct_link === 'true'}
-                                  onChange={(e) =>
-                                    setNewStorage({
-                                      ...newStorage,
-                                      config: { ...newStorage.config, enable_direct_link: String(e.target.checked) },
-                                    })
-                                  }
-                                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <label htmlFor="minio-enable-direct-link" className="text-sm text-slate-700">
-                                  启用直链访问
-                                </label>
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Public Endpoint</label>
-                                <Input
-                                  placeholder="https://cdn.example.com"
-                                  onChange={(e) =>
-                                    setNewStorage({
-                                      ...newStorage,
-                                      config: { ...newStorage.config, public_endpoint: e.target.value },
-                                    })
-                                  }
-                                />
-                                <p className="text-xs text-slate-500">
-                                  用户访问图片时使用的 CDN 域名或 MinIO 外部地址
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  id="minio-public-bucket"
-                                  checked={newStorage.config.is_public_bucket === 'true'}
-                                  onChange={(e) =>
-                                    setNewStorage({
-                                      ...newStorage,
-                                      config: { ...newStorage.config, is_public_bucket: String(e.target.checked) },
-                                    })
-                                  }
-                                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                />
-                                <label htmlFor="minio-public-bucket" className="text-sm text-slate-700">
-                                  公开 Bucket（无需签名访问）
-                                </label>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {newStorage.config.type === 'webdav' && (
-                        <>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">WebDAV URL</label>
-                            <Input
-                              placeholder="https://dav.example.com"
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, webdav_url: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">用户名</label>
-                            <Input
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, webdav_username: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">密码</label>
-                            <Input
-                              type="password"
-                              onChange={(e) =>
-                                setNewStorage({
-                                  ...newStorage,
-                                  config: { ...newStorage.config, webdav_password: e.target.value },
-                                })
-                              }
-                            />
-                          </div>
-                        </>
-                      )}
-
-                      <div className="flex items-center gap-2 pt-2">
-                        <input
-                          type="checkbox"
-                          id="is_default"
-                          checked={newStorage.is_default}
-                          onChange={(e) =>
-                            setNewStorage({ ...newStorage, is_default: e.target.checked })
-                          }
-                          className="rounded border-gray-300"
-                        />
-                        <label htmlFor="is_default" className="text-sm">
-                          设为默认存储
-                        </label>
-                      </div>
-
-                      <div className="flex justify-end gap-3 pt-4">
-                        <Button variant="outline" onClick={() => setIsCreateStorageOpen(false)}>
-                          取消
-                        </Button>
-                        <Button onClick={handleCreateStorage} className="bg-indigo-600 hover:bg-indigo-700">
-                          创建
-                        </Button>
-                      </div>
+              {/* 图片处理设置卡片 */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5" />
+                    图片处理
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* 缩略图开关 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">生成缩略图</label>
+                      <p className="text-xs text-slate-500">上传后自动生成缩略图</p>
                     </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!storageConfigs || storageConfigs.length === 0 ? (
-                <div className="text-center py-10">
-                  <Database className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">暂无存储配置</p>
-                  <p className="text-sm text-slate-400 mt-1">创建存储配置以开始使用</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {storageConfigs.map((config) => (
-                    <div
-                      key={config.id}
-                      className={`flex items-center justify-between p-4 rounded-lg border ${
-                        config.is_default
-                          ? 'bg-indigo-50 border-indigo-200'
-                          : 'bg-slate-50 border-slate-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                            config.is_default ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-600'
-                          }`}
-                        >
-                          {getCategoryIcon(config.category)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{config.name}</span>
-                            {config.is_default && (
-                              <Badge className="bg-indigo-600">默认</Badge>
-                            )}
-                            <Badge variant={config.is_enabled ? 'default' : 'secondary'}>
-                              {config.is_enabled ? '启用' : '禁用'}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-slate-500">
-                            {getCategoryName(config.category)} · {formatDate(config.created_at)}
-                          </p>
-                          {Boolean(config.config && (config.config as Record<string, unknown>).type) && (
-                            <p className="text-xs text-slate-400">
-                              类型: {getStorageTypeName(String((config.config as Record<string, unknown>).type))}
-                              {(config.config as Record<string, unknown>).path ? ` · 路径: ${String((config.config as Record<string, unknown>).path)}` : ''}
-                              {(config.config as Record<string, unknown>).endpoint ? ` · Endpoint: ${String((config.config as Record<string, unknown>).endpoint)}` : ''}
-                              {(config.config as Record<string, unknown>).bucket_name ? ` · Bucket: ${String((config.config as Record<string, unknown>).bucket_name)}` : ''}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {!config.is_default && config.is_enabled && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleSetDefault(config.id)}
-                          >
-                            设为默认
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEditStorage(config)}
-                        >
-                          编辑
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleTestStorage(config.id)}
-                        >
-                          测试
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                          onClick={() => handleDeleteStorage(config.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                    <Switch
+                      checked={conversionConfig.thumbnail_enabled}
+                      onCheckedChange={(checked) => handleUpdateConversion('thumbnail_enabled', checked)}
+                      disabled={isUpdatingConversion}
+                    />
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 缩略图质量 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">缩略图质量</label>
+                      <span className="text-sm text-slate-500">{conversionConfig.thumbnail_quality}%</span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={conversionConfig.thumbnail_quality}
+                      onChange={(e) => handleUpdateConversion('thumbnail_quality', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-100，建议值：80-90</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* WebP 转换开关 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">启用 WebP 转换</label>
+                      <p className="text-xs text-slate-500">上传后自动转换为 WebP 格式</p>
+                    </div>
+                    <Switch
+                      checked={conversionConfig.conversion_enabled_formats.includes('webp')}
+                      onCheckedChange={handleWebPToggle}
+                      disabled={isUpdatingConversion}
+                    />
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* WebP 质量 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">WebP 质量</label>
+                      <span className="text-sm text-slate-500">{conversionConfig.webp_quality}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={conversionConfig.webp_quality}
+                      onChange={(e) => handleUpdateConversion('webp_quality', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-100，建议值：75-85</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* WebP Effort */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">WebP 编码 effort</label>
+                      <span className="text-sm text-slate-500">{conversionConfig.webp_effort}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={6}
+                      value={conversionConfig.webp_effort}
+                      onChange={(e) => handleUpdateConversion('webp_effort', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">0=最快，6=最小文件</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* AVIF 实验性功能 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium flex items-center gap-2">
+                        启用 AVIF（实验性）
+                        <Badge variant="outline" className="text-xs">Beta</Badge>
+                      </label>
+                      <p className="text-xs text-slate-500">上传后同时生成 AVIF 格式（需要更多 CPU）</p>
+                    </div>
+                    <Switch
+                      checked={conversionConfig.avif_experimental}
+                      onCheckedChange={(checked) => handleUpdateConversion('avif_experimental', checked)}
+                      disabled={isUpdatingConversion}
+                    />
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* AVIF 质量 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">AVIF 质量</label>
+                      <span className="text-sm text-slate-500">{conversionConfig.avif_quality}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={conversionConfig.avif_quality}
+                      onChange={(e) => handleUpdateConversion('avif_quality', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion || !conversionConfig.avif_experimental}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-100</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* AVIF 速度 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">AVIF 编码速度</label>
+                      <span className="text-sm text-slate-500">{conversionConfig.avif_speed}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={10}
+                      value={conversionConfig.avif_speed}
+                      onChange={(e) => handleUpdateConversion('avif_speed', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion || !conversionConfig.avif_experimental}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">0=最小文件，10=最快</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 跳过小文件 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">跳过小于 (KB)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={conversionConfig.skip_smaller_than}
+                      onChange={(e) => handleUpdateConversion('skip_smaller_than', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
+                      className="w-32"
+                    />
+                    <p className="text-xs text-slate-500">小于此值的图片不转换格式，0=不限制</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 最大处理尺寸 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">最大处理尺寸 (px)</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={conversionConfig.max_dimension}
+                      onChange={(e) => handleUpdateConversion('max_dimension', parseInt(e.target.value))}
+                      disabled={isUpdatingConversion}
+                      className="w-32"
+                    />
+                    <p className="text-xs text-slate-500">超过此尺寸的图片会被缩放，0=无限制</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center py-8 text-slate-500">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                加载中...
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* 传输设置 */}
@@ -981,89 +770,74 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                传输模式设置
+                <Link2 className="h-5 w-5" />
+                传输模式
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent>
               <div className="space-y-4">
-                <div
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    transferMode === 'auto'
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                  onClick={() => !isUpdatingTransferMode && handleUpdateTransferMode('auto')}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
-                      transferMode === 'auto' ? 'border-indigo-500' : 'border-slate-300'
-                    }`}>
-                      {transferMode === 'auto' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-slate-800">自动模式</h4>
-                      <p className="text-sm text-slate-500 mt-1">
-                        根据存储配置自动决定使用代理还是直链。优先使用存储级别的设置。
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    id="mode-auto"
+                    name="transfer-mode"
+                    value="auto"
+                    checked={transferMode === 'auto'}
+                    onChange={(e) => handleUpdateTransferMode(e.target.value as TransferMode)}
+                    disabled={isUpdatingTransferMode}
+                    className="mt-1"
+                  />
+                  <div>
+                    <label htmlFor="mode-auto" className="font-medium cursor-pointer">
+                      自动模式
+                    </label>
+                    <p className="text-sm text-slate-500">
+                      系统根据存储配置自动选择传输方式（推荐）
+                    </p>
                   </div>
                 </div>
 
-                <div
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    transferMode === 'always_proxy'
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                  onClick={() => !isUpdatingTransferMode && handleUpdateTransferMode('always_proxy')}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
-                      transferMode === 'always_proxy' ? 'border-indigo-500' : 'border-slate-300'
-                    }`}>
-                      {transferMode === 'always_proxy' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-slate-800">始终代理</h4>
-                      <p className="text-sm text-slate-500 mt-1">
-                        所有图片都通过 Go 服务器代理访问。兼容性好，但会增加服务器带宽。
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    id="mode-proxy"
+                    name="transfer-mode"
+                    value="always_proxy"
+                    checked={transferMode === 'always_proxy'}
+                    onChange={(e) => handleUpdateTransferMode(e.target.value as TransferMode)}
+                    disabled={isUpdatingTransferMode}
+                    className="mt-1"
+                  />
+                  <div>
+                    <label htmlFor="mode-proxy" className="font-medium cursor-pointer">
+                      总是代理
+                    </label>
+                    <p className="text-sm text-slate-500">
+                      所有图片都通过服务器代理访问（隐藏真实存储地址）
+                    </p>
                   </div>
                 </div>
 
-                <div
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    transferMode === 'always_direct'
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                  onClick={() => !isUpdatingTransferMode && handleUpdateTransferMode('always_direct')}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${
-                      transferMode === 'always_direct' ? 'border-indigo-500' : 'border-slate-300'
-                    }`}>
-                      {transferMode === 'always_direct' && <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-slate-800">始终直链</h4>
-                      <p className="text-sm text-slate-500 mt-1">
-                        所有图片都通过 302 重定向到 CDN/MinIO 直接访问。需要正确配置存储的直链设置。
-                      </p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    id="mode-direct"
+                    name="transfer-mode"
+                    value="always_direct"
+                    checked={transferMode === 'always_direct'}
+                    onChange={(e) => handleUpdateTransferMode(e.target.value as TransferMode)}
+                    disabled={isUpdatingTransferMode}
+                    className="mt-1"
+                  />
+                  <div>
+                    <label htmlFor="mode-direct" className="font-medium cursor-pointer">
+                      总是直连
+                    </label>
+                    <p className="text-sm text-slate-500">
+                      直接访问存储服务的 URL（性能更好，但会暴露存储地址）
+                    </p>
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-amber-800 mb-2">配置说明</h4>
-                <ul className="text-sm text-amber-700 space-y-1 list-disc list-inside">
-                  <li>自动模式：优先使用存储配置中的直链设置</li>
-                  <li>始终代理：所有请求都经过 Go 服务器，适合内网部署</li>
-                  <li>始终直链：适合有 CDN 或 MinIO 公开访问的场景</li>
-                </ul>
               </div>
             </CardContent>
           </Card>
@@ -1078,64 +852,36 @@ export default function Settings() {
                 随机图源相册
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-slate-500">
-                  设置登录页面随机背景图片的来源相册。选择"所有公开图片"将使用系统中所有公开的图片。
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">选择相册</label>
+                <p className="text-xs text-slate-500 mb-2">
+                  登录页面背景将从这个相册中随机选取图片显示
                 </p>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">选择图源相册</label>
-                  {isUpdatingRandomSource ? (
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      更新中...
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => handleUpdateRandomSourceAlbum(null)}
-                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
-                          randomSourceAlbum === null
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Globe className="h-5 w-5 text-slate-400" />
-                          <span className="text-sm font-medium">所有公开图片</span>
-                        </div>
-                        {randomSourceAlbum === null && (
-                          <Check className="h-4 w-4 text-indigo-600" />
-                        )}
-                      </button>
-
-                      {albums.map((album) => (
-                        <button
-                          key={album.id}
-                          onClick={() => handleUpdateRandomSourceAlbum(album.id)}
-                          className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
-                            randomSourceAlbum === album.id
-                              ? 'border-indigo-500 bg-indigo-50'
-                              : 'border-slate-200 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Folder className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm font-medium">{album.name}</span>
-                            <span className="text-xs text-slate-400">
-                              {album.image_count} 张图片
-                            </span>
-                          </div>
-                          {randomSourceAlbum === album.id && (
-                            <Check className="h-4 w-4 text-indigo-600" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <select
+                  value={randomSourceAlbum === null ? '' : randomSourceAlbum}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    handleUpdateRandomSourceAlbum(value === '' ? null : parseInt(value));
+                  }}
+                  disabled={isUpdatingRandomSource}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                >
+                  <option value="">所有公开图片</option>
+                  {albums.map((album) => (
+                    <option key={album.id} value={album.id}>
+                      {album.name} ({album.image_count} 张图片)
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {isUpdatingRandomSource && (
+                <div className="flex items-center text-sm text-slate-500">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  保存中...
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1145,98 +891,109 @@ export default function Settings() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5" />
-                系统信息
+                <Server className="h-5 w-5" />
+                系统状态
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 系统状态 */}
-              {systemStatus && (
+            <CardContent>
+              {!systemStatus ? (
+                <div className="text-center py-8 text-slate-500">暂无系统状态信息</div>
+              ) : (
                 <>
-                  {/* 运行环境 */}
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">运行环境</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <p className="text-sm text-slate-500">版本</p>
+                      <p className="font-medium">{systemStatus.version || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">环境</p>
+                      <p className="font-medium">{systemStatus.environment || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Go 版本</p>
+                      <p className="font-medium">{systemStatus.go_version || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-500">Commit</p>
+                      <p className="font-medium text-sm font-mono">{systemStatus.commit_hash || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-4 mb-6">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      数据目录
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-sm text-slate-500">环境</p>
-                        <p className="font-medium text-sm">{systemStatus.environment}</p>
+                        <p className="text-slate-500">路径</p>
+                        <p className="font-medium text-xs font-mono break-all">{systemStatus.data_dir?.path || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">缓存</p>
-                        <p className="font-medium text-sm">{systemStatus.cache.provider}</p>
+                        <p className="text-slate-500">文件数</p>
+                        <p className="font-medium">{systemStatus.data_dir?.file_count?.toLocaleString() || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">CPU 核心</p>
-                        <p className="font-medium text-sm">{systemStatus.runtime.num_cpu}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-slate-500">Goroutines</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.goroutines}</p>
+                        <p className="text-slate-500">总大小</p>
+                        <p className="font-medium">{systemStatus.data_dir?.size_str || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* 内存使用 */}
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">内存使用</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="border-t border-slate-200 pt-4">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <HardDrive className="h-4 w-4" />
+                      内存使用
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-sm text-slate-500">堆内存分配</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.heap_alloc_str}</p>
+                        <p className="text-slate-500">堆内存</p>
+                        <p className="font-medium">{systemStatus.memory?.heap_alloc_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">堆系统内存</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.heap_sys_str}</p>
+                        <p className="text-slate-500">系统内存</p>
+                        <p className="font-medium">{systemStatus.memory?.heap_sys_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">堆使用内存</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.heap_in_use_str}</p>
+                        <p className="text-slate-500">GC 系统</p>
+                        <p className="font-medium">{systemStatus.memory?.gc_sys_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">GC 系统内存</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.gc_sys_str}</p>
+                        <p className="text-slate-500">栈内存</p>
+                        <p className="font-medium">{systemStatus.memory?.stack_sys_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">栈内存</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.stack_sys_str}</p>
+                        <p className="text-slate-500">累计分配</p>
+                        <p className="font-medium">{systemStatus.memory?.total_alloc_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">GC 次数</p>
-                        <p className="font-medium text-sm">{systemStatus.memory.num_gc}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 数据目录 */}
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">数据目录</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-sm text-slate-500">路径</p>
-                        <p className="font-medium text-sm font-mono">{systemStatus.data_dir.path}</p>
+                        <p className="text-slate-500">GC 次数</p>
+                        <p className="font-medium">{systemStatus.memory?.num_gc?.toLocaleString() || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">文件数</p>
-                        <p className="font-medium text-sm">{systemStatus.data_dir.file_count}</p>
+                        <p className="text-slate-500">Goroutines</p>
+                        <p className="font-medium">{systemStatus.memory?.goroutines?.toLocaleString() || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">总大小</p>
-                        <p className="font-medium text-sm">{systemStatus.data_dir.size_str}</p>
+                        <p className="text-slate-500">CPU 核心</p>
+                        <p className="font-medium">{systemStatus.runtime?.num_cpu || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Go 运行时 */}
-                  <div className="border-t pt-4">
-                    <h4 className="text-sm font-medium text-slate-700 mb-3">Go 运行时</h4>
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="border-t border-slate-200 pt-4 mt-6">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Database className="h-4 w-4" />
+                      缓存配置
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-sm text-slate-500">Go 版本</p>
-                        <p className="font-medium text-sm font-mono">{systemStatus.go_version}</p>
+                        <p className="text-slate-500">Provider</p>
+                        <p className="font-medium">{systemStatus.cache?.provider || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-sm text-slate-500">Commit</p>
-                        <p className="font-medium text-sm font-mono">{systemStatus.commit_hash || 'N/A'}</p>
+                        <p className="text-slate-500">Type</p>
+                        <p className="font-medium">{systemStatus.cache?.type || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -1256,202 +1013,6 @@ export default function Settings() {
         onConfirm={confirmDialog.onConfirm}
         variant={confirmDialog.variant}
       />
-
-      {/* 编辑存储配置弹窗 */}
-      <Dialog open={isEditStorageOpen} onOpenChange={setIsEditStorageOpen}>
-        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>编辑存储配置</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">配置名称</label>
-              <Input
-                value={newStorage.name}
-                onChange={(e) => setNewStorage({ ...newStorage, name: e.target.value })}
-                placeholder="例如：本地存储、MinIO主库"
-              />
-            </div>
-
-            {/* 存储类型 - 只读显示 */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-500">存储类型（不可修改）</label>
-              <Input
-                value={getStorageTypeName(newStorage.config.type)}
-                disabled
-                className="bg-slate-100 text-slate-500 cursor-not-allowed"
-              />
-              <p className="text-xs text-slate-400">存储类型创建后无法修改，如需更换请删除后重新创建</p>
-            </div>
-
-            {/* 根据类型显示只读的基础配置 */}
-            {newStorage.config.type === 'local' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-500">存储路径（不可修改）</label>
-                <Input
-                  value={newStorage.config.path || ''}
-                  disabled
-                  className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                />
-              </div>
-            )}
-
-            {newStorage.config.type === 'minio' && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">Endpoint（不可修改）</label>
-                  <Input
-                    value={newStorage.config.endpoint || ''}
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">Bucket（不可修改）</label>
-                  <Input
-                    value={newStorage.config.bucket_name || ''}
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">Access Key ID（不可修改）</label>
-                  <Input
-                    value="********"
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">Secret Access Key（不可修改）</label>
-                  <Input
-                    value="********"
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-                <div className="flex items-center gap-2 opacity-50">
-                  <input
-                    type="checkbox"
-                    checked={newStorage.config.use_ssl === 'true'}
-                    disabled
-                    className="w-4 h-4 rounded border-slate-300"
-                  />
-                  <label className="text-sm text-slate-500">使用 SSL/TLS (HTTPS)</label>
-                </div>
-
-                {/* Direct Link 配置 - 可编辑 */}
-                <div className="border-t pt-4 mt-4">
-                  <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-                    <Link2 className="h-4 w-4" />
-                    直链访问配置
-                  </h4>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="edit-enable-direct-link"
-                        checked={newStorage.config.enable_direct_link === 'true'}
-                        onChange={(e) =>
-                          setNewStorage({
-                            ...newStorage,
-                            config: { ...newStorage.config, enable_direct_link: String(e.target.checked) },
-                          })
-                        }
-                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <label htmlFor="edit-enable-direct-link" className="text-sm text-slate-700">
-                        启用直链访问
-                      </label>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Public Endpoint</label>
-                      <Input
-                        value={newStorage.config.public_endpoint || ''}
-                        onChange={(e) =>
-                          setNewStorage({
-                            ...newStorage,
-                            config: { ...newStorage.config, public_endpoint: e.target.value },
-                          })
-                        }
-                        placeholder="https://cdn.example.com"
-                      />
-                      <p className="text-xs text-slate-500">
-                        用户访问图片时使用的 CDN 域名或 MinIO 外部地址
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="edit-public-bucket"
-                        checked={newStorage.config.is_public_bucket === 'true'}
-                        onChange={(e) =>
-                          setNewStorage({
-                            ...newStorage,
-                            config: { ...newStorage.config, is_public_bucket: String(e.target.checked) },
-                          })
-                        }
-                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <label htmlFor="edit-public-bucket" className="text-sm text-slate-700">
-                        公开 Bucket（无需签名访问）
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {newStorage.config.type === 'webdav' && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">WebDAV URL（不可修改）</label>
-                  <Input
-                    value={newStorage.config.webdav_url || ''}
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">用户名（不可修改）</label>
-                  <Input
-                    value={newStorage.config.webdav_username || ''}
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500">密码（不可修改）</label>
-                  <Input
-                    value="********"
-                    disabled
-                    className="bg-slate-100 text-slate-500 cursor-not-allowed"
-                  />
-                </div>
-              </>
-            )}
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditStorageOpen(false);
-                  setEditingStorageId(null);
-                  setNewStorage({ name: '', config: { type: 'local' }, is_default: false });
-                }}
-              >
-                取消
-              </Button>
-              <Button onClick={handleUpdateStorage} className="bg-indigo-600 hover:bg-indigo-700">
-                保存修改
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

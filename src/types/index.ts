@@ -353,16 +353,37 @@ export interface MinIOConfig {
   is_public_bucket?: boolean;
 }
 
-// 系统设置
-export interface SystemSettings {
-  webp_enabled: boolean;
-  default_album_id: number;
-  concurrent_upload_limit: number;
-  max_file_size_mb: number;
-  image_quality: number;
-  api_key_enabled: boolean;
-  default_visibility: 'public' | 'private';
+// 缩略图尺寸
+export interface ThumbnailSize {
+  name: string;
+  width: number;
+  height: number;
 }
 
-// 更新系统设置请求
-export type UpdateSettingsRequest = Partial<SystemSettings>;
+// 转换配置（合并后的配置）
+export interface ConversionConfig {
+  // 缩略图设置
+  thumbnail_enabled: boolean;
+  thumbnail_sizes: ThumbnailSize[];
+  thumbnail_quality: number;
+  // 格式转换设置
+  conversion_enabled_formats: string[];
+  webp_quality: number;
+  webp_effort: number;
+  avif_quality: number;
+  avif_speed: number;
+  avif_experimental: boolean;
+  // 处理限制
+  skip_smaller_than: number;
+  max_dimension: number;
+  // 上传设置
+  default_album_id: number;
+  default_visibility: 'public' | 'private';
+  concurrent_upload_limit: number;
+  max_file_size_mb: number;
+  // 功能开关
+  api_key_enabled: boolean;
+}
+
+// 更新转换配置请求
+export type UpdateConversionRequest = Partial<ConversionConfig>;
