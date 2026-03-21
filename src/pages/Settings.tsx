@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { fetchSystemStatus } from '@/api/system';
+import { fetchSystemStatus, fetchSystemSettings, updateSystemSettings } from '@/api/system';
 import { fetchAlbums } from '@/api/albums';
 import {
   fetchStorageConfigs,
@@ -27,10 +27,11 @@ import {
   fetchRandomSourceAlbum,
   updateRandomSourceAlbum
 } from '@/api/images';
-import type { StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig } from '@/types';
+import type { StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig, SystemSettings } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 
 export default function Settings() {
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
@@ -64,6 +65,10 @@ export default function Settings() {
   const [transferMode, setTransferMode] = useState<TransferMode>('auto');
   const [isUpdatingTransferMode, setIsUpdatingTransferMode] = useState(false);
 
+  // 系统设置
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
+
   // 存储配置表单
   const [newStorage, setNewStorage] = useState<{
     name: string;
@@ -82,12 +87,13 @@ export default function Settings() {
     setLoading(true);
     try {
       // 分别处理每个请求，避免一个失败影响其他请求
-      const [storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult] = await Promise.allSettled([
+      const [storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult, systemSettingsResult] = await Promise.allSettled([
         fetchStorageConfigs(),
         fetchAlbums(),
         fetchRandomSourceAlbum(),
         fetchSystemStatus(),
         fetchTransferMode(),
+        fetchSystemSettings(),
       ]);
 
       // 处理存储配置数据
@@ -138,6 +144,13 @@ export default function Settings() {
       } else {
         console.error('加载 Transfer Mode 配置失败:', transferModeResult.reason);
         setTransferMode('auto');
+      }
+
+      // 处理系统设置数据
+      if (systemSettingsResult.status === 'fulfilled') {
+        setSystemSettings(systemSettingsResult.value);
+      } else {
+        console.error('加载系统设置失败:', systemSettingsResult.reason);
       }
     } catch (error) {
       toast({
@@ -364,6 +377,32 @@ export default function Settings() {
     }
   };
 
+  // 系统设置管理
+  const handleUpdateSetting = async <K extends keyof SystemSettings>(
+    key: K,
+    value: SystemSettings[K]
+  ) => {
+    if (!systemSettings) return;
+
+    setIsUpdatingSettings(true);
+    try {
+      const updated = await updateSystemSettings({ [key]: value });
+      setSystemSettings(updated);
+      toast({
+        title: '更新成功',
+        description: '设置已保存',
+      });
+    } catch (error) {
+      toast({
+        title: '更新失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingSettings(false);
+    }
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'storage':
@@ -437,11 +476,153 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="general">通用设置</TabsTrigger>
           <TabsTrigger value="transfer">传输设置</TabsTrigger>
           <TabsTrigger value="background">登录背景</TabsTrigger>
           <TabsTrigger value="system">系统信息</TabsTrigger>
         </TabsList>
+
+        {/* 通用设置 */}
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                通用设置
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {systemSettings ? (
+                <>
+                  {/* WebP 转换 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">自动转换 WebP</label>
+                      <p className="text-xs text-slate-500">上传图片后自动转换为 WebP 格式</p>
+                    </div>
+                    <Switch
+                      checked={systemSettings.webp_enabled}
+                      onCheckedChange={(checked) => handleUpdateSetting('webp_enabled', checked)}
+                      disabled={isUpdatingSettings}
+                    />
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* API Key 认证 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">启用 API Token 认证</label>
+                      <p className="text-xs text-slate-500">关闭后上传接口将不需要 Token 认证</p>
+                    </div>
+                    <Switch
+                      checked={systemSettings.api_key_enabled}
+                      onCheckedChange={(checked) => handleUpdateSetting('api_key_enabled', checked)}
+                      disabled={isUpdatingSettings}
+                    />
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 默认可见性 */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <label className="text-sm font-medium">默认可见性</label>
+                      <p className="text-xs text-slate-500">新上传图片的默认访问权限</p>
+                    </div>
+                    <select
+                      value={systemSettings.default_visibility}
+                      onChange={(e) => handleUpdateSetting('default_visibility', e.target.value as 'public' | 'private')}
+                      disabled={isUpdatingSettings}
+                      className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+                    >
+                      <option value="public">公开</option>
+                      <option value="private">私有</option>
+                    </select>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 并发上传限制 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">批量上传并发数</label>
+                      <span className="text-sm text-slate-500">{systemSettings.concurrent_upload_limit}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={10}
+                      value={systemSettings.concurrent_upload_limit}
+                      onChange={(e) => handleUpdateSetting('concurrent_upload_limit', parseInt(e.target.value))}
+                      disabled={isUpdatingSettings}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-10，建议值：3-5</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 文件大小限制 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">单文件大小限制 (MB)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={systemSettings.max_file_size_mb}
+                      onChange={(e) => handleUpdateSetting('max_file_size_mb', parseInt(e.target.value))}
+                      disabled={isUpdatingSettings}
+                      className="w-32"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-500 MB</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 图片质量 */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">WebP/缩略图质量</label>
+                      <span className="text-sm text-slate-500">{systemSettings.image_quality}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={systemSettings.image_quality}
+                      onChange={(e) => handleUpdateSetting('image_quality', parseInt(e.target.value))}
+                      disabled={isUpdatingSettings}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-100，建议值：80-90</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 默认相册 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">默认上传相册</label>
+                    <select
+                      value={systemSettings.default_album_id}
+                      onChange={(e) => handleUpdateSetting('default_album_id', parseInt(e.target.value))}
+                      disabled={isUpdatingSettings}
+                      className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm"
+                    >
+                      <option value={0}>不指定（使用上次选择的相册）</option>
+                      {albums.map((album) => (
+                        <option key={album.id} value={album.id}>
+                          {album.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-500">上传时默认选中的相册，0 表示不指定</p>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center py-8 text-slate-500">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  加载中...
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* 存储配置 */}
         <TabsContent value="storage" className="space-y-6">

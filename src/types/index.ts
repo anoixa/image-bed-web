@@ -352,3 +352,17 @@ export interface MinIOConfig {
   public_endpoint?: string;
   is_public_bucket?: boolean;
 }
+
+// 系统设置
+export interface SystemSettings {
+  webp_enabled: boolean;
+  default_album_id: number;
+  concurrent_upload_limit: number;
+  max_file_size_mb: number;
+  image_quality: number;
+  api_key_enabled: boolean;
+  default_visibility: 'public' | 'private';
+}
+
+// 更新系统设置请求
+export type UpdateSettingsRequest = Partial<SystemSettings>;
