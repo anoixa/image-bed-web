@@ -382,32 +382,33 @@ export default function Settings() {
   };
 
   // 验证配置值是否有效
+  // 注意：0 表示不更新该字段，是合法值
   const validateConfig = (config: ConversionConfig): string | null => {
-    // 检查必须在 1–500 范围内的字段（不允许为 0）
-    if (config.max_file_size_mb < 1 || config.max_file_size_mb > 500) {
-      return '单文件大小限制必须在 1–500 MB 之间';
+    // 检查必须在 1–500 范围内的字段（0 表示不更新）
+    if (config.max_file_size_mb !== 0 && (config.max_file_size_mb < 1 || config.max_file_size_mb > 500)) {
+      return '单文件大小限制必须在 1–500 MB 之间（或设为 0 表示不更新）';
     }
-    if (config.max_batch_total_mb < 1 || config.max_batch_total_mb > 500) {
-      return '批量上传总大小限制必须在 1–500 MB 之间';
-    }
-
-    // 检查必须在 1–10 范围内的字段
-    if (config.concurrent_upload_limit < 1 || config.concurrent_upload_limit > 10) {
-      return '批量上传并发数必须在 1–10 之间';
+    if (config.max_batch_total_mb !== 0 && (config.max_batch_total_mb < 1 || config.max_batch_total_mb > 500)) {
+      return '批量上传总大小限制必须在 1–500 MB 之间（或设为 0 表示不更新）';
     }
 
-    // 检查必须在 1–100 范围内的字段
-    if (config.thumbnail_quality < 1 || config.thumbnail_quality > 100) {
-      return '缩略图质量必须在 1–100 之间';
-    }
-    if (config.webp_quality < 1 || config.webp_quality > 100) {
-      return 'WebP 质量必须在 1–100 之间';
-    }
-    if (config.avif_quality < 1 || config.avif_quality > 100) {
-      return 'AVIF 质量必须在 1–100 之间';
+    // 检查必须在 1–10 范围内的字段（0 表示不更新）
+    if (config.concurrent_upload_limit !== 0 && (config.concurrent_upload_limit < 1 || config.concurrent_upload_limit > 10)) {
+      return '批量上传并发数必须在 1–10 之间（或设为 0 表示不更新）';
     }
 
-    // 检查其他范围
+    // 检查必须在 1–100 范围内的字段（0 表示不更新）
+    if (config.thumbnail_quality !== 0 && (config.thumbnail_quality < 1 || config.thumbnail_quality > 100)) {
+      return '缩略图质量必须在 1–100 之间（或设为 0 表示不更新）';
+    }
+    if (config.webp_quality !== 0 && (config.webp_quality < 1 || config.webp_quality > 100)) {
+      return 'WebP 质量必须在 1–100 之间（或设为 0 表示不更新）';
+    }
+    if (config.avif_quality !== 0 && (config.avif_quality < 1 || config.avif_quality > 100)) {
+      return 'AVIF 质量必须在 1–100 之间（或设为 0 表示不更新）';
+    }
+
+    // 检查其他范围（这些字段 0 是有效值，不是"不更新"）
     if (config.webp_effort < 0 || config.webp_effort > 6) {
       return 'WebP 压缩努力度必须在 0–6 之间';
     }
