@@ -381,6 +381,7 @@ export interface ConversionConfig {
   default_visibility: 'public' | 'private';
   concurrent_upload_limit: number;
   max_file_size_mb: number;
+  max_batch_total_mb: number;
   // 功能开关
   api_key_enabled: boolean;
 }

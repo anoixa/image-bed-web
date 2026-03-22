@@ -405,12 +405,41 @@ export default function Settings() {
     }
   };
 
-  // 重置配置
+  // 重置为服务器配置
   const handleResetConfig = () => {
     if (conversionConfig) {
       setEditingConfig(conversionConfig);
       setHasChanges(false);
     }
+  };
+
+  // 恢复系统默认配置
+  const handleRestoreDefaults = () => {
+    const defaultConfig: ConversionConfig = {
+      thumbnail_enabled: true,
+      thumbnail_sizes: [{ name: 'default', width: 600, height: 0 }],
+      thumbnail_quality: 85,
+      conversion_enabled_formats: ['webp'],
+      webp_quality: 75,
+      webp_effort: 4,
+      avif_quality: 80,
+      avif_speed: 4,
+      avif_experimental: false,
+      skip_smaller_than: 10,
+      max_dimension: 4096,
+      default_album_id: 0,
+      default_visibility: 'public',
+      concurrent_upload_limit: 3,
+      max_file_size_mb: 50,
+      max_batch_total_mb: 500,
+      api_key_enabled: true,
+    };
+    setEditingConfig(defaultConfig);
+    setHasChanges(true);
+    toast({
+      title: '已恢复默认',
+      description: '配置已恢复为系统默认值，点击保存以应用',
+    });
   };
 
   const getCategoryIcon = (category: string) => {
@@ -498,28 +527,38 @@ export default function Settings() {
           {editingConfig ? (
             <>
               {/* 操作按钮 */}
-              <div className="flex justify-end gap-3">
+              <div className="flex justify-between items-center">
                 <Button
-                  variant="outline"
-                  onClick={handleResetConfig}
-                  disabled={!hasChanges || isUpdatingConversion}
+                  variant="ghost"
+                  onClick={handleRestoreDefaults}
+                  disabled={isUpdatingConversion}
+                  className="text-slate-500 hover:text-slate-700"
                 >
-                  重置
+                  恢复默认
                 </Button>
-                <Button
-                  onClick={handleSaveConfig}
-                  disabled={!hasChanges || isUpdatingConversion}
-                  className="bg-indigo-600 hover:bg-indigo-700"
-                >
-                  {isUpdatingConversion ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      保存中...
-                    </>
-                  ) : (
-                    '保存设置'
-                  )}
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleResetConfig}
+                    disabled={!hasChanges || isUpdatingConversion}
+                  >
+                    重置
+                  </Button>
+                  <Button
+                    onClick={handleSaveConfig}
+                    disabled={!hasChanges || isUpdatingConversion}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    {isUpdatingConversion ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        保存中...
+                      </>
+                    ) : (
+                      '保存设置'
+                    )}
+                  </Button>
+                </div>
               </div>
 
               {/* 上传设置卡片 */}
@@ -588,6 +627,21 @@ export default function Settings() {
                       max={500}
                       value={editingConfig.max_file_size_mb}
                       onChange={(e) => handleEditConfig('max_file_size_mb', parseInt(e.target.value))}
+                      className="w-32"
+                    />
+                    <p className="text-xs text-slate-500">范围：1-500 MB</p>
+                  </div>
+                  <div className="border-t border-slate-200" />
+
+                  {/* 批量总大小限制 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">批量上传总大小限制 (MB)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={editingConfig.max_batch_total_mb}
+                      onChange={(e) => handleEditConfig('max_batch_total_mb', parseInt(e.target.value))}
                       className="w-32"
                     />
                     <p className="text-xs text-slate-500">范围：1-500 MB</p>
