@@ -381,9 +381,63 @@ export default function Settings() {
     handleEditConfig('conversion_enabled_formats', formats);
   };
 
+  // 验证配置值是否有效
+  const validateConfig = (config: ConversionConfig): string | null => {
+    // 检查必须在 1–500 范围内的字段（不允许为 0）
+    if (config.max_file_size_mb < 1 || config.max_file_size_mb > 500) {
+      return '单文件大小限制必须在 1–500 MB 之间';
+    }
+    if (config.max_batch_total_mb < 1 || config.max_batch_total_mb > 500) {
+      return '批量上传总大小限制必须在 1–500 MB 之间';
+    }
+
+    // 检查必须在 1–10 范围内的字段
+    if (config.concurrent_upload_limit < 1 || config.concurrent_upload_limit > 10) {
+      return '批量上传并发数必须在 1–10 之间';
+    }
+
+    // 检查必须在 1–100 范围内的字段
+    if (config.thumbnail_quality < 1 || config.thumbnail_quality > 100) {
+      return '缩略图质量必须在 1–100 之间';
+    }
+    if (config.webp_quality < 1 || config.webp_quality > 100) {
+      return 'WebP 质量必须在 1–100 之间';
+    }
+    if (config.avif_quality < 1 || config.avif_quality > 100) {
+      return 'AVIF 质量必须在 1–100 之间';
+    }
+
+    // 检查其他范围
+    if (config.webp_effort < 0 || config.webp_effort > 6) {
+      return 'WebP 压缩努力度必须在 0–6 之间';
+    }
+    if (config.avif_speed < 0 || config.avif_speed > 8) {
+      return 'AVIF 编码速度必须在 0–8 之间';
+    }
+    if (config.skip_smaller_than < 0) {
+      return '跳过小文件转换不能为负数';
+    }
+    if (config.max_dimension < 0) {
+      return '最大图片尺寸不能为负数';
+    }
+
+    return null;
+  };
+
   // 保存配置到服务器
   const handleSaveConfig = async () => {
     if (!editingConfig) return;
+
+    // 前端校验
+    const error = validateConfig(editingConfig);
+    if (error) {
+      toast({
+        title: '保存失败',
+        description: error,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsUpdatingConversion(true);
     try {
@@ -574,7 +628,7 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <label className="text-sm font-medium">启用 API Token 认证</label>
-                      <p className="text-xs text-slate-500">关闭后上传接口将不需要 Token 认证</p>
+                      <p className="text-xs text-slate-500">控制是否允许通过 API Token 进行上传认证。关闭后，API Token 将无法用于任何上传操作，仅支持账号登录（JWT）方式访问上传接口。</p>
                     </div>
                     <Switch
                       checked={editingConfig.api_key_enabled}
@@ -587,7 +641,7 @@ export default function Settings() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <label className="text-sm font-medium">默认可见性</label>
-                      <p className="text-xs text-slate-500">新上传图片的默认访问权限</p>
+                      <p className="text-xs text-slate-500">上传图片的默认访问权限。"public" 所有人可访问，"private" 仅本人可见。</p>
                     </div>
                     <select
                       value={editingConfig.default_visibility}
@@ -608,49 +662,49 @@ export default function Settings() {
                     </div>
                     <input
                       type="range"
-                      min={1}
+                      min={0}
                       max={10}
                       value={editingConfig.concurrent_upload_limit}
                       onChange={(e) => handleEditConfig('concurrent_upload_limit', parseInt(e.target.value))}
                       className="w-full"
                     />
-                    <p className="text-xs text-slate-500">范围：1-10，建议值：3-5</p>
+                    <p className="text-xs text-slate-500">批量上传时同时处理的文件数量上限，避免服务器过载。设为 0 表示不更新。范围：1–10。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* 文件大小限制 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">单文件大小限制 (MB)</label>
+                    <label className="text-sm font-medium">单文件大小限制（MB）</label>
                     <Input
                       type="number"
-                      min={1}
+                      min={0}
                       max={500}
                       value={editingConfig.max_file_size_mb}
                       onChange={(e) => handleEditConfig('max_file_size_mb', parseInt(e.target.value))}
                       className="w-32"
                     />
-                    <p className="text-xs text-slate-500">范围：1-500 MB</p>
+                    <p className="text-xs text-slate-500">单张图片的最大允许上传大小。超出后服务端会拒绝处理。设为 0 表示不更新。范围：1–500。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* 批量总大小限制 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">批量上传总大小限制 (MB)</label>
+                    <label className="text-sm font-medium">批量上传总大小限制（MB）</label>
                     <Input
                       type="number"
-                      min={1}
+                      min={0}
                       max={500}
                       value={editingConfig.max_batch_total_mb}
                       onChange={(e) => handleEditConfig('max_batch_total_mb', parseInt(e.target.value))}
                       className="w-32"
                     />
-                    <p className="text-xs text-slate-500">范围：1-500 MB</p>
+                    <p className="text-xs text-slate-500">单次批量上传所有文件的总大小上限。设为 0 表示不更新。范围：1–500。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* 默认相册 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">默认上传相册</label>
+                    <label className="text-sm font-medium">默认相册</label>
                     <select
                       value={editingConfig.default_album_id}
                       onChange={(e) => handleEditConfig('default_album_id', parseInt(e.target.value))}
@@ -663,7 +717,7 @@ export default function Settings() {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-slate-500">上传时默认选中的相册，0 表示不指定</p>
+                    <p className="text-xs text-slate-500">上传图片时自动归入的相册 ID。设为 0 表示不自动归类。</p>
                   </div>
                 </CardContent>
               </Card>
@@ -680,8 +734,8 @@ export default function Settings() {
                   {/* 缩略图开关 */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <label className="text-sm font-medium">生成缩略图</label>
-                      <p className="text-xs text-slate-500">上传后自动生成缩略图</p>
+                      <label className="text-sm font-medium">启用缩略图</label>
+                      <p className="text-xs text-slate-500">上传图片后自动生成缩略图。启用后可加快图片列表加载速度，关闭则仅保存原图。</p>
                     </div>
                     <Switch
                       checked={editingConfig.thumbnail_enabled}
@@ -698,21 +752,21 @@ export default function Settings() {
                     </div>
                     <input
                       type="range"
-                      min={1}
+                      min={0}
                       max={100}
                       value={editingConfig.thumbnail_quality}
                       onChange={(e) => handleEditConfig('thumbnail_quality', parseInt(e.target.value))}
                       className="w-full"
                     />
-                    <p className="text-xs text-slate-500">范围：1-100，建议值：80-90</p>
+                    <p className="text-xs text-slate-500">缩略图的 WebP 压缩质量，数值越高画质越好，文件也越大。设为 0 视为不更新。范围：1–100。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* WebP 转换开关 */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <label className="text-sm font-medium">启用 WebP 转换</label>
-                      <p className="text-xs text-slate-500">上传后自动转换为 WebP 格式</p>
+                      <label className="text-sm font-medium">启用的转换格式</label>
+                      <p className="text-xs text-slate-500">上传后自动转换的目标格式列表。目前支持 "webp"，AVIF 为实验性功能。空数组表示不做任何格式转换。</p>
                     </div>
                     <Switch
                       checked={editingConfig.conversion_enabled_formats.includes('webp')}
@@ -729,20 +783,20 @@ export default function Settings() {
                     </div>
                     <input
                       type="range"
-                      min={1}
+                      min={0}
                       max={100}
                       value={editingConfig.webp_quality}
                       onChange={(e) => handleEditConfig('webp_quality', parseInt(e.target.value))}
                       className="w-full"
                     />
-                    <p className="text-xs text-slate-500">范围：1-100，建议值：75-85</p>
+                    <p className="text-xs text-slate-500">WebP 转换的压缩质量，数值越高越清晰。系统会根据图片复杂度自动微调（±5~10）。设为 0 视为不更新。范围：1–100。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* WebP Effort */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">WebP 编码 effort</label>
+                      <label className="text-sm font-medium">WebP 压缩努力度</label>
                       <span className="text-sm text-slate-500">{editingConfig.webp_effort}</span>
                     </div>
                     <input
@@ -753,7 +807,7 @@ export default function Settings() {
                       onChange={(e) => handleEditConfig('webp_effort', parseInt(e.target.value))}
                       className="w-full"
                     />
-                    <p className="text-xs text-slate-500">0=最快，6=最小文件</p>
+                    <p className="text-xs text-slate-500">WebP 编码的压缩努力程度，越高压缩率越好但越慢。范围：0（最快）–6（最小体积）。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
@@ -764,7 +818,7 @@ export default function Settings() {
                         启用 AVIF（实验性）
                         <Badge variant="outline" className="text-xs">Beta</Badge>
                       </label>
-                      <p className="text-xs text-slate-500">上传后同时生成 AVIF 格式（需要更多 CPU）</p>
+                      <p className="text-xs text-slate-500">开启 AVIF 格式支持。该功能尚处于实验阶段，可能存在兼容性问题，建议仅在测试环境使用。</p>
                     </div>
                     <Switch
                       checked={editingConfig.avif_experimental}
@@ -781,14 +835,14 @@ export default function Settings() {
                     </div>
                     <input
                       type="range"
-                      min={1}
+                      min={0}
                       max={100}
                       value={editingConfig.avif_quality}
                       onChange={(e) => handleEditConfig('avif_quality', parseInt(e.target.value))}
                       disabled={!editingConfig.avif_experimental}
                       className="w-full"
                     />
-                    <p className="text-xs text-slate-500">范围：1-100</p>
+                    <p className="text-xs text-slate-500">AVIF 格式的压缩质量。仅在启用的转换格式包含 "avif" 时生效。设为 0 视为不更新。范围：1–100。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
@@ -801,19 +855,19 @@ export default function Settings() {
                     <input
                       type="range"
                       min={0}
-                      max={10}
+                      max={8}
                       value={editingConfig.avif_speed}
                       onChange={(e) => handleEditConfig('avif_speed', parseInt(e.target.value))}
                       disabled={!editingConfig.avif_experimental}
                       className="w-full"
                     />
-                    <p className="text-xs text-slate-500">0=最小文件，10=最快</p>
+                    <p className="text-xs text-slate-500">AVIF 编码速度，越低压缩率越高但耗时更长。范围：0（最慢最小）–8（最快最大）。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* 跳过小文件 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">跳过小于 (KB)</label>
+                    <label className="text-sm font-medium">跳过小文件转换（KB）</label>
                     <Input
                       type="number"
                       min={0}
@@ -821,13 +875,13 @@ export default function Settings() {
                       onChange={(e) => handleEditConfig('skip_smaller_than', parseInt(e.target.value))}
                       className="w-32"
                     />
-                    <p className="text-xs text-slate-500">小于此值的图片不转换格式，0=不限制</p>
+                    <p className="text-xs text-slate-500">文件小于此大小（单位 KB）时跳过格式转换，避免转换后体积反而变大。设为 0 则不跳过。</p>
                   </div>
                   <div className="border-t border-slate-200" />
 
                   {/* 最大处理尺寸 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">最大处理尺寸 (px)</label>
+                    <label className="text-sm font-medium">最大图片尺寸（px）</label>
                     <Input
                       type="number"
                       min={0}
@@ -835,7 +889,7 @@ export default function Settings() {
                       onChange={(e) => handleEditConfig('max_dimension', parseInt(e.target.value))}
                       className="w-32"
                     />
-                    <p className="text-xs text-slate-500">超过此尺寸的图片会被缩放，0=无限制</p>
+                    <p className="text-xs text-slate-500">图片宽或高超过此像素时拒绝处理，防止超大图片占用过多内存。设为 0 表示不限制。</p>
                   </div>
                 </CardContent>
               </Card>
