@@ -38,7 +38,7 @@ function BatchLinksContent({ images, format, onCopyAll }: BatchLinksContentProps
   const allLinksText = images.map(getLinkValue).join('\n');
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 flex flex-col max-h-[60vh]">
       <div className="flex justify-between items-center">
         <span className="text-sm text-slate-500">共 {images.length} 张图片</span>
         <Button variant="outline" size="sm" onClick={onCopyAll}>
@@ -46,7 +46,7 @@ function BatchLinksContent({ images, format, onCopyAll }: BatchLinksContentProps
           复制全部
         </Button>
       </div>
-      <div className="h-48 overflow-y-auto rounded-md border bg-slate-50 p-3">
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-md border bg-slate-50 p-3">
         <div className="space-y-2">
           {images.map((image, index) => (
             <div key={image.identifier} className="flex items-center gap-2 text-sm">
@@ -61,7 +61,7 @@ function BatchLinksContent({ images, format, onCopyAll }: BatchLinksContentProps
       <textarea
         readOnly
         value={allLinksText}
-        className="w-full h-20 font-mono text-xs bg-slate-100 border rounded-md p-2 resize-none"
+        className="w-full h-20 font-mono text-xs bg-slate-100 border rounded-md p-2 resize-none shrink-0"
       />
     </div>
   );
