@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
-import { uploadImage } from '@/api/images';
+import { uploadImageWithProgress, uploadImagesWithProgress } from '@/api/images';
 import { toast } from '@/components/ui/use-toast';
 import type { UploadImageResponse, Image } from '@/types';
 
@@ -162,18 +162,6 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
     );
   };
 
-  const simulateProgress = (id: string) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress >= 90) {
-        progress = 90;
-        clearInterval(interval);
-      }
-      updateFileStatus(id, { progress });
-    }, 200);
-    return interval;
-  };
 
   const generateLinkFormats = (image: UploadImageResponse): LinkFormat[] => {
     const url = image.links?.url || '';
@@ -193,33 +181,40 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
     setIsUploading(true);
     setTotalProgress(0);
     const pendingFiles = files.filter((f) => f.status !== 'success');
-    const uploadedImages: UploadImageResponse[] = [];
-    const total = pendingFiles.length;
 
-    for (let i = 0; i < pendingFiles.length; i++) {
-      const fileItem = pendingFiles[i];
-      updateFileStatus(fileItem.id, { status: 'uploading', progress: 10 });
-      const progressInterval = simulateProgress(fileItem.id);
+    // 单文件上传：使用单文件 API 带进度
+    if (pendingFiles.length === 1) {
+      const fileItem = pendingFiles[0];
+      updateFileStatus(fileItem.id, { status: 'uploading', progress: 0 });
 
       try {
         const strategyId = storageId ? parseInt(storageId, 10) : undefined;
-        const image = await uploadImage(fileItem.file, true, strategyId);
-        clearInterval(progressInterval);
+        const image = await uploadImageWithProgress(
+          fileItem.file,
+          true,
+          strategyId,
+          (progress) => {
+            updateFileStatus(fileItem.id, { progress });
+            setTotalProgress(progress);
+          }
+        );
         updateFileStatus(fileItem.id, {
           status: 'success',
           progress: 100,
           result: image,
         });
-        uploadedImages.push(image);
-        setTotalProgress(Math.round(((i + 1) / total) * 100));
+        setTotalProgress(100);
         onSuccess?.({
           identifier: image.identifier,
           filename: image.filename,
           file_size: image.file_size,
           url: image.links.url,
         } as Image);
+        setAllUploadedImages([image]);
+        const links = generateLinkFormats(image);
+        setCurrentLinks(links);
+        setShowLinks(true);
       } catch (error) {
-        clearInterval(progressInterval);
         const errorMsg = error instanceof Error ? error.message : '上传失败';
         updateFileStatus(fileItem.id, {
           status: 'error',
@@ -232,51 +227,84 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
           variant: 'destructive',
         });
       }
+    } else {
+      // 批量上传：使用批量 API 带总进度
+      pendingFiles.forEach((f) => updateFileStatus(f.id, { status: 'uploading', progress: 0 }));
+
+      try {
+        const strategyId = storageId ? parseInt(storageId, 10) : undefined;
+        const filesToUpload = pendingFiles.map((f) => f.file);
+        const result = await uploadImagesWithProgress(
+          filesToUpload,
+          true,
+          strategyId,
+          (progress) => {
+            setTotalProgress(progress);
+            // 所有文件的进度与总进度保持一致
+            pendingFiles.forEach((f) => {
+              updateFileStatus(f.id, { progress });
+            });
+          }
+        );
+
+        // 批量上传成功后更新所有文件状态
+        if (result.success && result.success.length > 0) {
+          // 将 success 数组映射为 UploadImageResponse 格式
+          const uploadedImages: UploadImageResponse[] = result.success.map((item) => ({
+            identifier: item.identifier,
+            filename: item.filename,
+            file_size: item.file_size,
+            links: item.links,
+          }));
+
+          result.success.forEach((item, index) => {
+            if (pendingFiles[index]) {
+              updateFileStatus(pendingFiles[index].id, {
+                status: 'success',
+                progress: 100,
+                result: uploadedImages[index],
+              });
+            }
+          });
+          setAllUploadedImages(uploadedImages);
+          const lastImage = uploadedImages[uploadedImages.length - 1];
+          const links = generateLinkFormats(lastImage);
+          setCurrentLinks(links);
+          setShowLinks(true);
+
+          // 调用每个成功上传的回调
+          uploadedImages.forEach((image) => {
+            onSuccess?.({
+              identifier: image.identifier,
+              filename: image.filename,
+              file_size: image.file_size,
+              url: image.links?.url || '',
+            } as Image);
+          });
+
+          toast({
+            title: '上传成功',
+            description: `成功上传 ${result.success.length} 张图片`,
+          });
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : '上传失败';
+        pendingFiles.forEach((f) => {
+          updateFileStatus(f.id, {
+            status: 'error',
+            progress: 0,
+            errorMessage: errorMsg,
+          });
+        });
+        toast({
+          title: '上传失败',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+      }
     }
 
     setIsUploading(false);
-
-    if (uploadedImages.length > 0) {
-      setAllUploadedImages(uploadedImages);
-      const lastImage = uploadedImages[uploadedImages.length - 1];
-      const links = generateLinkFormats(lastImage);
-      setCurrentLinks(links);
-      
-      // 自动复制 URL
-      const urlLink = links.find((l) => l.key === 'url');
-      if (urlLink) {
-        try {
-          if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(urlLink.value);
-          } else {
-            const textarea = document.createElement('textarea');
-            textarea.value = urlLink.value;
-            textarea.style.position = 'fixed';
-            textarea.style.left = '-999999px';
-            textarea.style.top = '0';
-            document.body.appendChild(textarea);
-            textarea.focus();
-            textarea.select();
-            const success = document.execCommand('copy');
-            document.body.removeChild(textarea);
-            if (!success) {
-              throw new Error('execCommand copy failed');
-            }
-          }
-          toast({
-            title: '上传成功',
-            description: '链接已自动复制到剪贴板',
-          });
-        } catch {
-          toast({
-            title: '上传成功',
-            description: '图片已上传，请手动复制链接',
-          });
-        }
-      }
-      
-      setShowLinks(true);
-    }
   };
 
   const handleClose = () => {

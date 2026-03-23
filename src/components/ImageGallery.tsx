@@ -65,6 +65,10 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const [isBatchRemoving, setIsBatchRemoving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  
+  // 单张图片删除确认状态
+  const [showSingleDeleteConfirm, setShowSingleDeleteConfirm] = useState(false);
+  const [imageToDelete, setImageToDelete] = useState<string | null>(null);
 
   // 相册选择弹窗状态
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
@@ -251,10 +255,19 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     };
   }, [hasMore, loading, currentPage, loadImages]);
 
-  const handleDelete = async (identifier: string) => {
+  // 显示单张图片删除确认
+  const handleShowDeleteConfirm = (identifier: string) => {
+    setImageToDelete(identifier);
+    setShowSingleDeleteConfirm(true);
+  };
+
+  // 执行单张图片删除
+  const handleConfirmSingleDelete = async () => {
+    if (!imageToDelete) return;
+    
     try {
-      await deleteImage(identifier);
-      setImages((prev) => prev.filter((img) => img.identifier !== identifier));
+      await deleteImage(imageToDelete);
+      setImages((prev) => prev.filter((img) => img.identifier !== imageToDelete));
       toast({
         title: '删除成功',
         description: '图片已删除',
@@ -265,7 +278,16 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         description: error instanceof Error ? error.message : '请稍后重试',
         variant: 'destructive',
       });
+    } finally {
+      setShowSingleDeleteConfirm(false);
+      setImageToDelete(null);
     }
+  };
+
+  // 取消单张图片删除
+  const handleCancelSingleDelete = () => {
+    setShowSingleDeleteConfirm(false);
+    setImageToDelete(null);
   };
 
   // 批量选择处理
@@ -655,6 +677,18 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         variant="default"
       />
 
+      {/* 单张图片删除确认对话框 */}
+      <ConfirmDialog
+        open={showSingleDeleteConfirm}
+        onOpenChange={setShowSingleDeleteConfirm}
+        title="确认删除"
+        description="确定要删除这张图片吗？此操作不可恢复。"
+        onConfirm={handleConfirmSingleDelete}
+        confirmText="删除"
+        cancelText="取消"
+        variant="destructive"
+      />
+
       {/* Justified Layout Gallery - 等高瀑布流布局 */}
       <JustifiedGallery
         images={images}
@@ -672,7 +706,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         isBatchMode={isBatchMode}
         selectedImages={selectedImages}
         onLoadMore={() => loadImages(currentPage + 1, true)}
-        onDelete={handleDelete}
+        onDelete={handleShowDeleteConfirm}
         onAddToAlbum={handleAddToAlbum}
         onBatchDelete={handleBatchDelete}
         onBatchRemoveFromAlbum={handleBatchRemoveFromAlbum}

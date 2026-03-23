@@ -1,4 +1,4 @@
-import { get, post, del, put, upload } from '@/lib/request';
+import { get, post, del, put, upload, uploadWithProgress } from '@/lib/request';
 import type {
   Image,
   PaginatedResponse,
@@ -83,6 +83,22 @@ export const uploadImage = (
   return upload('/api/v1/images/upload', formData);
 };
 
+// 上传单张图片（带进度回调）
+export const uploadImageWithProgress = (
+  file: File,
+  isPublic: boolean = true,
+  strategyId?: number,
+  onProgress?: (progress: number) => void
+): Promise<UploadImageResponse> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('is_public', String(isPublic));
+  if (strategyId) {
+    formData.append('strategy_id', String(strategyId));
+  }
+  return uploadWithProgress('/api/v1/images/upload', formData, onProgress);
+};
+
 // 批量上传图片 - 使用 is_public 和 strategy_id
 export const uploadImages = (
   files: File[],
@@ -98,6 +114,24 @@ export const uploadImages = (
     formData.append('strategy_id', String(strategyId));
   }
   return upload('/api/v1/images/uploads', formData);
+};
+
+// 批量上传图片（带进度回调）
+export const uploadImagesWithProgress = (
+  files: File[],
+  isPublic: boolean = true,
+  strategyId?: number,
+  onProgress?: (progress: number) => void
+): Promise<BatchUploadResult> => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('files[]', file);
+  });
+  formData.append('is_public', String(isPublic));
+  if (strategyId) {
+    formData.append('strategy_id', String(strategyId));
+  }
+  return uploadWithProgress('/api/v1/images/uploads', formData, onProgress);
 };
 
 // 删除单张图片 - DELETE /api/v1/images/{identifier}

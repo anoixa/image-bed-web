@@ -325,4 +325,29 @@ export const upload = <T>(url: string, formData: FormData, config?: AxiosRequest
   });
 };
 
+// 带进度回调的上传函数
+export const uploadWithProgress = <T>(
+  url: string,
+  formData: FormData,
+  onProgress?: (progress: number) => void,
+  config?: AxiosRequestConfig
+): Promise<T> => {
+  return request
+    .post<ApiResponse<T>>(url, formData, {
+      ...config,
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && progressEvent.total > 0) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress?.(progress);
+        }
+      },
+    })
+    .then((res) => {
+      if (res.data.status === 'error') {
+        throw new Error(res.data.msg || '上传失败');
+      }
+      return res.data.data as T;
+    });
+};
+
 export default request;
