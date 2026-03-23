@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder } from 'lucide-react';
+import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder, RefreshCw } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1029,11 +1029,20 @@ export default function Settings() {
         {/* 系统信息 */}
         <TabsContent value="system" className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Server className="h-5 w-5" />
                 系统状态
               </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadData}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+                刷新
+              </Button>
             </CardHeader>
             <CardContent>
               {!systemStatus ? (

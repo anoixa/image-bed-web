@@ -22,6 +22,8 @@ import {
   Server,
   BookOpen,
   Cloud,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
 import { setDefaultStorageConfig } from '@/api/configs';
@@ -65,7 +67,7 @@ const navItems: NavItem[] = [
 ];
 
 // 导航项链接组件 - 保留 URL 查询参数
-function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+function NavItemLink({ item, onNavigate, collapsed = false }: { item: NavItem; onNavigate?: () => void; collapsed?: boolean }) {
   const Icon = item.icon;
   const [searchParams] = useSearchParams();
   const location = useLocation();
@@ -84,19 +86,20 @@ function NavItemLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => v
           isActive
             ? 'bg-indigo-50 text-indigo-600'
             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-        }`
+        } ${collapsed ? 'justify-center px-2' : ''}`
       }
+      title={collapsed ? item.label : undefined}
     >
       <Icon className="w-5 h-5" />
-      {item.label}
+      {!collapsed && item.label}
     </NavLink>
   );
 }
 
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function Sidebar({ onNavigate, collapsed, onToggleCollapse }: { onNavigate?: () => void; collapsed?: boolean; onToggleCollapse?: () => void }) {
   return (
-    <div className="flex flex-col h-full bg-white border-r border-slate-200/60">
-      <div className="p-6 flex items-center gap-3">
+    <div className="flex flex-col h-full bg-white border-r border-slate-200/60 relative">
+      <div className={`p-6 flex items-center gap-3 ${collapsed ? 'justify-center p-4' : ''}`}>
         <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="8" y="12" width="20" height="20" rx="6" fill="#E2E8F0" />
           <rect x="11" y="9" width="20" height="20" rx="6" fill="#94A3B8" />
@@ -109,30 +112,39 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </linearGradient>
           </defs>
         </svg>
-        <span className="text-xl font-bold text-slate-800 tracking-tight">Image Bed</span>
+        {!collapsed && <span className="text-xl font-bold text-slate-800 tracking-tight">Image Bed</span>}
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavItemLink
-              key={item.path}
-              item={item}
-              onNavigate={onNavigate}
-            />
-          );
-        })}
+      <nav className={`flex-1 px-4 py-4 space-y-1 ${collapsed ? 'px-2' : ''}`}>
+        {navItems.map((item) => (
+          <NavItemLink
+            key={item.path}
+            item={item}
+            onNavigate={onNavigate}
+            collapsed={collapsed}
+          />
+        ))}
       </nav>
 
-      <div className="p-4 border-t border-slate-200/60">
-        <LogoutButton />
+      <div className={`p-4 border-t border-slate-200/60 ${collapsed ? 'px-2' : ''}`}>
+        <LogoutButton collapsed={collapsed} />
       </div>
+
+      {/* 折叠/展开按钮 */}
+      {onToggleCollapse && (
+        <button
+          onClick={onToggleCollapse}
+          className="absolute -right-3 top-20 w-6 h-6 bg-white border border-slate-200 rounded-full shadow-sm flex items-center justify-center hover:bg-slate-50 hover:shadow transition-all"
+          title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3 text-slate-500" /> : <ChevronLeft className="w-3 h-3 text-slate-500" />}
+        </button>
+      )}
     </div>
   );
 }
 
-function LogoutButton() {
+function LogoutButton({ collapsed = false }: { collapsed?: boolean }) {
   const logout = useAuthStore((state) => state.logout);
   const navigate = useNavigate();
 
@@ -148,10 +160,11 @@ function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="flex items-center gap-3 px-4 py-2.5 w-full rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+      className={`flex items-center gap-3 px-4 py-2.5 w-full rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors ${collapsed ? 'justify-center px-2' : ''}`}
+      title={collapsed ? '退出登录' : undefined}
     >
       <LogOut className="w-5 h-5" />
-      退出登录
+      {!collapsed && '退出登录'}
     </button>
   );
 }
@@ -159,6 +172,7 @@ function LogoutButton() {
 export default function DashboardLayout() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // 标记是否有上传成功，关闭弹窗时刷新
   const hasUploadSuccess = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -342,8 +356,11 @@ export default function DashboardLayout() {
   return (
     <div className="min-h-screen bg-slate-50 flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-64 fixed h-full z-40">
-        <Sidebar />
+      <aside className={`hidden lg:block ${isSidebarCollapsed ? 'w-20' : 'w-64'} fixed h-full z-40 transition-all duration-300`}>
+        <Sidebar
+          collapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
       </aside>
 
       {/* Mobile Sidebar */}
@@ -354,7 +371,7 @@ export default function DashboardLayout() {
       </Sheet>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-64">
+      <div className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
         {/* Header */}
         <header className="sticky top-0 z-50 w-full border-b border-slate-200/60 bg-white/80 backdrop-blur-md">
           <div className="flex items-center justify-between px-6 h-16">
