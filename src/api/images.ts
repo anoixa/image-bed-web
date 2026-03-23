@@ -75,7 +75,7 @@ export const uploadImage = (
   strategyId?: number
 ): Promise<UploadImageResponse> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('files', file);
   formData.append('is_public', String(isPublic));
   if (strategyId) {
     formData.append('strategy_id', String(strategyId));
@@ -91,7 +91,7 @@ export const uploadImageWithProgress = (
   onProgress?: (progress: number) => void
 ): Promise<UploadImageResponse> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('files', file);
   formData.append('is_public', String(isPublic));
   if (strategyId) {
     formData.append('strategy_id', String(strategyId));
@@ -107,13 +107,13 @@ export const uploadImages = (
 ): Promise<BatchUploadResult> => {
   const formData = new FormData();
   files.forEach((file) => {
-    formData.append('files[]', file);
+    formData.append('files', file);
   });
   formData.append('is_public', String(isPublic));
   if (strategyId) {
     formData.append('strategy_id', String(strategyId));
   }
-  return upload('/api/v1/images/uploads', formData);
+  return upload('/api/v1/images/upload', formData);
 };
 
 // 批量上传图片（带进度回调）
@@ -125,13 +125,13 @@ export const uploadImagesWithProgress = (
 ): Promise<BatchUploadResult> => {
   const formData = new FormData();
   files.forEach((file) => {
-    formData.append('files[]', file);
+    formData.append('files', file);
   });
   formData.append('is_public', String(isPublic));
   if (strategyId) {
     formData.append('strategy_id', String(strategyId));
   }
-  return uploadWithProgress('/api/v1/images/uploads', formData, onProgress);
+  return uploadWithProgress('/api/v1/images/upload', formData, onProgress);
 };
 
 // 删除单张图片 - DELETE /api/v1/images/{identifier}
