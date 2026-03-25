@@ -1086,6 +1086,10 @@ export default function Settings() {
                         <p className="text-slate-500">总大小</p>
                         <p className="font-medium">{systemStatus.data_dir?.size_str || 'N/A'}</p>
                       </div>
+                      <div>
+                        <p className="text-slate-500">总大小(字节)</p>
+                        <p className="font-medium text-xs font-mono">{systemStatus.data_dir?.total_size?.toLocaleString() || 'N/A'}</p>
+                      </div>
                     </div>
                   </div>
 
@@ -1100,16 +1104,24 @@ export default function Settings() {
                         <p className="font-medium">{systemStatus.memory?.heap_alloc_str || 'N/A'}</p>
                       </div>
                       <div>
+                        <p className="text-slate-500">堆内存使用</p>
+                        <p className="font-medium">{systemStatus.memory?.heap_in_use_str || 'N/A'}</p>
+                      </div>
+                      <div>
                         <p className="text-slate-500">系统内存</p>
                         <p className="font-medium">{systemStatus.memory?.heap_sys_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-slate-500">GC 系统</p>
-                        <p className="font-medium">{systemStatus.memory?.gc_sys_str || 'N/A'}</p>
+                        <p className="text-slate-500">RSS 内存</p>
+                        <p className="font-medium">{systemStatus.memory?.rss_str || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-slate-500">栈内存</p>
                         <p className="font-medium">{systemStatus.memory?.stack_sys_str || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">GC 系统</p>
+                        <p className="font-medium">{systemStatus.memory?.gc_sys_str || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-slate-500">累计分配</p>
@@ -1124,8 +1136,33 @@ export default function Settings() {
                         <p className="font-medium">{systemStatus.memory?.goroutines?.toLocaleString() || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-slate-500">CPU 核心</p>
-                        <p className="font-medium">{systemStatus.runtime?.num_cpu || 'N/A'}</p>
+                        <p className="text-slate-500">上次 GC</p>
+                        <p className="font-medium text-xs font-mono">{systemStatus.memory?.last_gc_time ? new Date(systemStatus.memory.last_gc_time * 1000).toLocaleString() : 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-200 pt-4 mt-6">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4" />
+                      Vips 内存
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-500">当前内存</p>
+                        <p className="font-medium">{systemStatus.memory?.vips_mem_str || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">内存峰值</p>
+                        <p className="font-medium">{systemStatus.memory?.vips_mem_high_str || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">分配次数</p>
+                        <p className="font-medium">{systemStatus.memory?.vips_allocs?.toLocaleString() || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">打开文件</p>
+                        <p className="font-medium">{systemStatus.memory?.vips_open_files?.toLocaleString() || 'N/A'}</p>
                       </div>
                     </div>
                   </div>

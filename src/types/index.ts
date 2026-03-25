@@ -206,9 +206,17 @@ export interface SystemStatus {
     stack_sys_str: string;
     total_alloc_mb: number;
     total_alloc_str: string;
+    rss_mb: number;
+    rss_str: string;
     last_gc_time: number;
     num_gc: number;
     goroutines: number;
+    vips_mem_mb: number;
+    vips_mem_str: string;
+    vips_mem_high_mb: number;
+    vips_mem_high_str: string;
+    vips_allocs: number;
+    vips_open_files: number;
   };
   runtime: {
     num_cpu: number;
