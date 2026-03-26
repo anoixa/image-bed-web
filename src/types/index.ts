@@ -313,6 +313,7 @@ export interface RandomImageResponse {
     id: number;
     identifier: string;
     url: string;
+    original_url: string;
     width: number;
     height: number;
     size: number;
@@ -321,6 +322,7 @@ export interface RandomImageResponse {
     created_at: string;
     variant?: {
       identifier: string;
+      request_identifier: string;
       format: string;
       url: string;
     };

@@ -191,18 +191,38 @@ export const getChunkedUploadStatus = (uploadId: string): Promise<ChunkedUploadS
 // 获取公开随机图片（登录页背景用，无需认证）
 // GET /images/random
 export const fetchRandomImage = async (
-  format: 'json' | 'binary' = 'json',
+  format: 'json' | 'image' = 'json',
   options?: {
+    albumId?: number | null;
     minWidth?: number;
     minHeight?: number;
+    maxWidth?: number;
+    maxHeight?: number;
     requireWebp?: boolean;
     maxFileSize?: number;
   }
 ): Promise<RandomImageResponse['data'] | null> => {
   const params = new URLSearchParams();
-  if (format === 'json') params.append('format', 'json');
+  
+  // format 参数：只允许 json 或 image
+  if (format === 'json') {
+    params.append('format', 'json');
+  } else {
+    params.append('format', 'image');
+  }
+  
+  // album_id 参数：
+  // - 0 表示"所有公开图片"
+  // - >0 表示指定相册
+  // - null/undefined 时使用后台配置的随机图源相册
+  if (options?.albumId !== undefined && options?.albumId !== null) {
+    params.append('album_id', String(options.albumId));
+  }
+  
   if (options?.minWidth) params.append('min_width', String(options.minWidth));
   if (options?.minHeight) params.append('min_height', String(options.minHeight));
+  if (options?.maxWidth) params.append('max_width', String(options.maxWidth));
+  if (options?.maxHeight) params.append('max_height', String(options.maxHeight));
   if (options?.requireWebp) params.append('require_webp', 'true');
   if (options?.maxFileSize) params.append('max_file_size', String(options.maxFileSize));
 
@@ -215,12 +235,24 @@ export const fetchRandomImage = async (
       },
     });
 
+    // 204: 没有符合条件的随机图片
     if (response.status === 204) {
-      return null; // 无可用图片
+      return null;
+    }
+    
+    // 400: 请求参数不合法
+    if (response.status === 400) {
+      const errorData = await response.json().catch(() => ({ msg: 'Invalid request parameters' }));
+      throw new Error(errorData.msg || 'Invalid request parameters');
+    }
+    
+    // 500: 服务端查询失败
+    if (response.status === 500) {
+      throw new Error('Server error');
     }
 
     if (!response.ok) {
-      return null;
+      throw new Error(`HTTP error: ${response.status}`);
     }
 
     if (format === 'json') {
@@ -229,8 +261,9 @@ export const fetchRandomImage = async (
     }
 
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    // 重新抛出错误，让调用者处理
+    throw error;
   }
 };
 
