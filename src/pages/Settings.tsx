@@ -1088,7 +1088,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <p className="text-slate-500">总大小(字节)</p>
-                        <p className="font-medium text-xs font-mono">{systemStatus.data_dir?.total_size?.toLocaleString() || 'N/A'}</p>
+                        <p className="font-medium">{systemStatus.data_dir?.total_size?.toLocaleString() || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -1137,7 +1137,7 @@ export default function Settings() {
                       </div>
                       <div>
                         <p className="text-slate-500">上次 GC</p>
-                        <p className="font-medium text-xs font-mono">{systemStatus.memory?.last_gc_time ? new Date(systemStatus.memory.last_gc_time * 1000).toLocaleString() : 'N/A'}</p>
+                        <p className="font-medium">{systemStatus.memory?.last_gc_time ? new Date(systemStatus.memory.last_gc_time * 1000).toLocaleString() : 'N/A'}</p>
                       </div>
                     </div>
                   </div>

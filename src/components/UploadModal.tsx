@@ -38,7 +38,7 @@ function BatchLinksContent({ images, format, onCopyAll }: BatchLinksContentProps
   const allLinksText = images.map(getLinkValue).join('\n');
 
   return (
-    <div className="space-y-3 flex flex-col max-h-[60vh]">
+    <div className="space-y-3 flex flex-col">
       <div className="flex justify-between items-center">
         <span className="text-sm text-slate-500">共 {images.length} 张图片</span>
         <Button variant="outline" size="sm" onClick={onCopyAll}>
@@ -484,7 +484,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl w-[calc(100vw-2rem)] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl w-[calc(100vw-2rem)] max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{showLinks ? '上传成功' : '上传图片'}</DialogTitle>
         </DialogHeader>
@@ -657,7 +657,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3 }}
-              className="space-y-4"
+              className="space-y-4 max-h-[70vh] overflow-y-auto pr-2"
             >
               {/* Success Icon & Preview */}
               <div className="flex flex-col items-center gap-4">
