@@ -102,7 +102,74 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
 
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
-  const handleFileSelect = useCallback((fileList: FileList | null) => {
+  // 生成缩略图（对大图片进行压缩）
+  const generateThumbnail = useCallback((file: File, maxWidth: number = 200, maxHeight: number = 200): Promise<string> => {
+    return new Promise((resolve) => {
+      // 小文件直接使用原图
+      if (file.size < 2 * 1024 * 1024) {
+        resolve(URL.createObjectURL(file));
+        return;
+      }
+
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        
+        // 如果图片尺寸不大，直接使用原图
+        if (img.width <= maxWidth && img.height <= maxHeight) {
+          resolve(URL.createObjectURL(file));
+          return;
+        }
+
+        // 计算缩放比例
+        let width = img.width;
+        let height = img.height;
+        const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+        width = Math.floor(width * ratio);
+        height = Math.floor(height * ratio);
+
+        // 创建 canvas 绘制缩略图
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          resolve(URL.createObjectURL(file));
+          return;
+        }
+
+        // 使用更好的图像质量
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // 转换为 blob URL
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(URL.createObjectURL(blob));
+            } else {
+              resolve(URL.createObjectURL(file));
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(URL.createObjectURL(file));
+      };
+
+      img.src = objectUrl;
+    });
+  }, []);
+
+  const handleFileSelect = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return;
 
     const imageFiles = Array.from(fileList).filter((file) => file.type.startsWith('image/'));
@@ -116,16 +183,19 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
       return;
     }
 
-    const newFiles: UploadFile[] = imageFiles.map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-      id: generateId(),
-      progress: 0,
-      status: 'pending',
-    }));
+    // 为每个文件生成缩略图
+    const newFiles: UploadFile[] = await Promise.all(
+      imageFiles.map(async (file) => ({
+        file,
+        preview: await generateThumbnail(file, 300, 300),
+        id: generateId(),
+        progress: 0,
+        status: 'pending',
+      }))
+    );
 
     setFiles((prev) => [...prev, ...newFiles]);
-  }, []);
+  }, [generateThumbnail]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
