@@ -374,7 +374,7 @@ export default function Settings() {
 
   // AVIF 开关本地编辑
   const handleAVIFToggle = (enabled: boolean) => {
-    if (!editingConfig) return;
+    if (!editingConfig || !conversionConfig?.avif_supported) return;
     const formats = enabled
       ? [...editingConfig.conversion_enabled_formats, 'avif']
       : editingConfig.conversion_enabled_formats.filter(f => f !== 'avif');
@@ -440,9 +440,19 @@ export default function Settings() {
       return;
     }
 
+    // 如果 AVIF 不被支持，从转换格式列表中移除
+    let configToSave = { ...editingConfig };
+    if (!conversionConfig?.avif_supported) {
+      configToSave.conversion_enabled_formats =
+        configToSave.conversion_enabled_formats.filter(f => f !== 'avif');
+    }
+
+    // 移除只读字段 avif_supported
+    const { avif_supported: _, ...saveData } = configToSave;
+
     setIsUpdatingConversion(true);
     try {
-      await updateConversionConfig(editingConfig);
+      await updateConversionConfig(saveData);
       setConversionConfig(editingConfig);
       setHasChanges(false);
       toast({
@@ -488,6 +498,7 @@ export default function Settings() {
       max_file_size_mb: 50,
       max_batch_total_mb: 500,
       api_key_enabled: true,
+      avif_supported: conversionConfig?.avif_supported ?? false,
     };
     setEditingConfig(defaultConfig);
     setHasChanges(true);
@@ -815,15 +826,24 @@ export default function Settings() {
                   {/* AVIF 实验性功能 */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <label className="text-sm font-medium flex items-center gap-2">
+                      <label className={`text-sm font-medium flex items-center gap-2 ${!conversionConfig?.avif_supported ? 'text-slate-400' : ''}`}>
                         启用 AVIF（实验性）
                         <Badge variant="outline" className="text-xs">Beta</Badge>
+                        {!conversionConfig?.avif_supported && (
+                          <Badge variant="secondary" className="text-xs">当前服务器不支持</Badge>
+                        )}
                       </label>
-                      <p className="text-xs text-slate-500">开启 AVIF 格式支持。该功能尚处于实验阶段，可能存在兼容性问题，建议仅在测试环境使用。</p>
+                      <p className="text-xs text-slate-500">
+                        {conversionConfig?.avif_supported
+                          ? '开启 AVIF 格式支持。该功能尚处于实验阶段，可能存在兼容性问题，建议仅在测试环境使用。'
+                          : '当前服务器运行时环境不支持 AVIF 格式转换。如需启用，请确保服务器已安装支持 AVIF 的 libvips 版本。'
+                        }
+                      </p>
                     </div>
                     <Switch
                       checked={editingConfig.avif_experimental}
                       onCheckedChange={(checked) => handleEditConfig('avif_experimental', checked)}
+                      disabled={!conversionConfig?.avif_supported}
                     />
                   </div>
                   <div className="border-t border-slate-200" />
@@ -831,7 +851,7 @@ export default function Settings() {
                   {/* AVIF 质量 */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">AVIF 质量</label>
+                      <label className={`text-sm font-medium ${!conversionConfig?.avif_supported ? 'text-slate-400' : ''}`}>AVIF 质量</label>
                       <span className="text-sm text-slate-500">{editingConfig.avif_quality}%</span>
                     </div>
                     <input
@@ -840,7 +860,7 @@ export default function Settings() {
                       max={100}
                       value={editingConfig.avif_quality}
                       onChange={(e) => handleEditConfig('avif_quality', parseInt(e.target.value))}
-                      disabled={!editingConfig.avif_experimental}
+                      disabled={!editingConfig.avif_experimental || !conversionConfig?.avif_supported}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">AVIF 格式的压缩质量。仅在启用的转换格式包含 "avif" 时生效。设为 0 视为不更新。范围：1–100。</p>
@@ -850,7 +870,7 @@ export default function Settings() {
                   {/* AVIF 速度 */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">AVIF 编码速度</label>
+                      <label className={`text-sm font-medium ${!conversionConfig?.avif_supported ? 'text-slate-400' : ''}`}>AVIF 编码速度</label>
                       <span className="text-sm text-slate-500">{editingConfig.avif_speed}</span>
                     </div>
                     <input
@@ -859,7 +879,7 @@ export default function Settings() {
                       max={8}
                       value={editingConfig.avif_speed}
                       onChange={(e) => handleEditConfig('avif_speed', parseInt(e.target.value))}
-                      disabled={!editingConfig.avif_experimental}
+                      disabled={!editingConfig.avif_experimental || !conversionConfig?.avif_supported}
                       className="w-full"
                     />
                     <p className="text-xs text-slate-500">AVIF 编码速度，越低压缩率越高但耗时更长。范围：0（最慢最小）–8（最快最大）。</p>

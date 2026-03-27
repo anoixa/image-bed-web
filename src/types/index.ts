@@ -370,7 +370,7 @@ export interface ThumbnailSize {
   height: number;
 }
 
-// 转换配置（合并后的配置）
+// 转换配置
 export interface ConversionConfig {
   // 缩略图设置
   thumbnail_enabled: boolean;
@@ -394,7 +394,9 @@ export interface ConversionConfig {
   max_batch_total_mb: number;
   // 功能开关
   api_key_enabled: boolean;
+  // AVIF 支持状态（只读，由后端返回）
+  avif_supported: boolean;
 }
 
-// 更新转换配置请求
-export type UpdateConversionRequest = Partial<ConversionConfig>;
+// 更新转换配置请求（排除只读字段 avif_supported）
+export type UpdateConversionRequest = Partial<Omit<ConversionConfig, 'avif_supported'>>;
