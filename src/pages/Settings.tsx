@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder, RefreshCw, Cpu, AlertTriangle, Zap, Activity } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -1069,6 +1070,7 @@ export default function Settings() {
                 <div className="text-center py-8 text-slate-500">暂无系统状态信息</div>
               ) : (
                 <>
+                  {/* 基础信息 */}
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     <div>
                       <p className="text-sm text-slate-500">版本</p>
@@ -1076,7 +1078,16 @@ export default function Settings() {
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">环境</p>
-                      <p className="font-medium">{systemStatus.environment || 'N/A'}</p>
+                      <Badge
+                        variant={systemStatus.environment === 'production' ? 'default' : 'secondary'}
+                        className={
+                          systemStatus.environment === 'production'
+                            ? 'bg-green-100 text-green-700 hover:bg-green-100'
+                            : 'bg-amber-100 text-amber-700 hover:bg-amber-100'
+                        }
+                      >
+                        {systemStatus.environment || 'N/A'}
+                      </Badge>
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Go 版本</p>
@@ -1084,85 +1095,156 @@ export default function Settings() {
                     </div>
                     <div>
                       <p className="text-sm text-slate-500">Commit</p>
-                      <p className="font-medium text-sm font-mono">{systemStatus.commit_hash || 'N/A'}</p>
+                      <p className="font-medium text-sm font-mono">
+                        {systemStatus.commit_hash ? systemStatus.commit_hash.slice(0, 8) : 'N/A'}
+                      </p>
                     </div>
                   </div>
 
+                  {/* Worker */}
                   <div className="border-t border-slate-200 pt-4 mb-6">
                     <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <Database className="h-4 w-4" />
-                      数据目录
+                      <Cpu className="h-4 w-4" />
+                      Worker
+                      {systemStatus.worker?.failed > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          {systemStatus.worker.failed} 失败
+                        </Badge>
+                      )}
                     </h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-slate-500">路径</p>
-                        <p className="font-medium text-xs font-mono break-all">{systemStatus.data_dir?.path || 'N/A'}</p>
+                        <p className="text-slate-500">队列</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Progress
+                            value={
+                              systemStatus.worker?.queue_cap > 0
+                                ? (systemStatus.worker.queue_size / systemStatus.worker.queue_cap) * 100
+                                : 0
+                            }
+                            className="h-2 flex-1"
+                          />
+                          <span className="text-xs text-slate-600 whitespace-nowrap">
+                            {systemStatus.worker?.queue_size?.toLocaleString() || 0} / {systemStatus.worker?.queue_cap?.toLocaleString() || 0}
+                          </span>
+                        </div>
                       </div>
                       <div>
-                        <p className="text-slate-500">文件数</p>
-                        <p className="font-medium">{systemStatus.data_dir?.file_count?.toLocaleString() || 'N/A'}</p>
+                        <p className="text-slate-500">Worker 数量</p>
+                        <p className="font-medium">{systemStatus.worker?.worker_count?.toLocaleString() ?? 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-slate-500">总大小</p>
-                        <p className="font-medium">{systemStatus.data_dir?.size_str || 'N/A'}</p>
+                        <p className="text-slate-500">进行中任务</p>
+                        <p className="font-medium">{systemStatus.worker?.in_flight_tasks?.toLocaleString() ?? 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-slate-500">总大小(字节)</p>
-                        <p className="font-medium">{systemStatus.data_dir?.total_size?.toLocaleString() || 'N/A'}</p>
+                        <p className="text-slate-500">进行中变体</p>
+                        <p className="font-medium">{systemStatus.worker?.in_flight_variants?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">已提交</p>
+                        <p className="font-medium">{systemStatus.worker?.submitted?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">已执行</p>
+                        <p className="font-medium">{systemStatus.worker?.executed?.toLocaleString() ?? 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-4">
+                  {/* Sweeper */}
+                  <div className="border-t border-slate-200 pt-4 mb-6">
                     <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <HardDrive className="h-4 w-4" />
+                      <Zap className="h-4 w-4" />
+                      Sweeper
+                      {systemStatus.sweeper?.errors > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          {systemStatus.sweeper.errors} 错误
+                        </Badge>
+                      )}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-500">运行次数</p>
+                        <p className="font-medium">{systemStatus.sweeper?.runs?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">最近成功</p>
+                        <p className="font-medium">
+                          {systemStatus.sweeper?.last_success_unix
+                            ? new Date(systemStatus.sweeper.last_success_unix * 1000).toLocaleString()
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">重置 Variants</p>
+                        <p className="font-medium">{systemStatus.sweeper?.reset_variants?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">失败 Variants</p>
+                        <p className="font-medium">{systemStatus.sweeper?.failed_variants?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">失败 Images</p>
+                        <p className="font-medium">{systemStatus.sweeper?.failed_images?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">重新触发</p>
+                        <p className="font-medium">{systemStatus.sweeper?.retriggered?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                    </div>
+                    {systemStatus.sweeper?.last_error_message && (
+                      <div className="mt-3 p-2 bg-red-50 rounded border border-red-100">
+                        <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          最近错误
+                        </p>
+                        <p className="text-xs text-red-700 mt-1 font-mono break-all">
+                          {systemStatus.sweeper.last_error_message}
+                        </p>
+                        {systemStatus.sweeper.last_error_unix > 0 && (
+                          <p className="text-xs text-red-500 mt-1">
+                            {new Date(systemStatus.sweeper.last_error_unix * 1000).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 内存使用 */}
+                  <div className="border-t border-slate-200 pt-4 mb-6">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
                       内存使用
                     </h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-slate-500">堆内存</p>
-                        <p className="font-medium">{systemStatus.memory?.heap_alloc_str || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">堆内存使用</p>
-                        <p className="font-medium">{systemStatus.memory?.heap_in_use_str || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">系统内存</p>
-                        <p className="font-medium">{systemStatus.memory?.heap_sys_str || 'N/A'}</p>
-                      </div>
                       <div>
                         <p className="text-slate-500">RSS 内存</p>
                         <p className="font-medium">{systemStatus.memory?.rss_str || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-slate-500">栈内存</p>
-                        <p className="font-medium">{systemStatus.memory?.stack_sys_str || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">GC 系统</p>
-                        <p className="font-medium">{systemStatus.memory?.gc_sys_str || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">累计分配</p>
-                        <p className="font-medium">{systemStatus.memory?.total_alloc_str || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">GC 次数</p>
-                        <p className="font-medium">{systemStatus.memory?.num_gc?.toLocaleString() || 'N/A'}</p>
+                        <p className="text-slate-500">堆内存</p>
+                        <p className="font-medium">{systemStatus.memory?.heap_alloc_str || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-slate-500">Goroutines</p>
-                        <p className="font-medium">{systemStatus.memory?.goroutines?.toLocaleString() || 'N/A'}</p>
+                        <p className="font-medium">{systemStatus.memory?.goroutines?.toLocaleString() ?? 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-slate-500">上次 GC</p>
-                        <p className="font-medium">{systemStatus.memory?.last_gc_time ? new Date(systemStatus.memory.last_gc_time * 1000).toLocaleString() : 'N/A'}</p>
+                        <p className="font-medium">
+                          {systemStatus.memory?.last_gc_time
+                            ? new Date(systemStatus.memory.last_gc_time * 1000).toLocaleString()
+                            : 'N/A'}
+                        </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-4 mt-6">
+                  {/* Vips 内存 */}
+                  <div className="border-t border-slate-200 pt-4 mb-6">
                     <h4 className="font-medium mb-3 flex items-center gap-2">
                       <ImageIcon className="h-4 w-4" />
                       Vips 内存
@@ -1178,16 +1260,39 @@ export default function Settings() {
                       </div>
                       <div>
                         <p className="text-slate-500">分配次数</p>
-                        <p className="font-medium">{systemStatus.memory?.vips_allocs?.toLocaleString() || 'N/A'}</p>
+                        <p className="font-medium">{systemStatus.memory?.vips_allocs?.toLocaleString() ?? 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-slate-500">打开文件</p>
-                        <p className="font-medium">{systemStatus.memory?.vips_open_files?.toLocaleString() || 'N/A'}</p>
+                        <p className="font-medium">{systemStatus.memory?.vips_open_files?.toLocaleString() ?? 'N/A'}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="border-t border-slate-200 pt-4 mt-6">
+                  {/* 数据目录 */}
+                  <div className="border-t border-slate-200 pt-4 mb-6">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <HardDrive className="h-4 w-4" />
+                      数据目录
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-slate-500">路径</p>
+                        <p className="font-medium text-xs font-mono break-all">{systemStatus.data_dir?.path || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">文件数</p>
+                        <p className="font-medium">{systemStatus.data_dir?.file_count?.toLocaleString() ?? 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">总大小</p>
+                        <p className="font-medium">{systemStatus.data_dir?.size_str || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 缓存配置 */}
+                  <div className="border-t border-slate-200 pt-4">
                     <h4 className="font-medium mb-3 flex items-center gap-2">
                       <Database className="h-4 w-4" />
                       缓存配置

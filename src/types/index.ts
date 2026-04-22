@@ -200,6 +200,10 @@ export interface SystemStatus {
     heap_sys_str: string;
     heap_in_use_mb: number;
     heap_in_use_str: string;
+    heap_idle_mb: number;
+    heap_idle_str: string;
+    heap_released_mb: number;
+    heap_released_str: string;
     gc_sys_mb: number;
     gc_sys_str: string;
     stack_sys_mb: number;
@@ -208,6 +212,10 @@ export interface SystemStatus {
     total_alloc_str: string;
     rss_mb: number;
     rss_str: string;
+    rss_anon_mb: number;
+    rss_anon_str: string;
+    rss_file_mb: number;
+    rss_file_str: string;
     last_gc_time: number;
     num_gc: number;
     goroutines: number;
@@ -220,6 +228,29 @@ export interface SystemStatus {
   };
   runtime: {
     num_cpu: number;
+  };
+  worker: {
+    submitted: number;
+    executed: number;
+    failed: number;
+    queue_size: number;
+    queue_cap: number;
+    worker_count: number;
+    in_flight_tasks: number;
+    in_flight_variants: number;
+  };
+  sweeper: {
+    runs: number;
+    errors: number;
+    reset_variants: number;
+    failed_variants: number;
+    failed_images: number;
+    reset_images: number;
+    retriggered: number;
+    last_run_unix: number;
+    last_success_unix: number;
+    last_error_unix: number;
+    last_error_message: string;
   };
 }
 
