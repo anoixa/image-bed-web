@@ -133,8 +133,8 @@ export interface UserListItem {
   username: string;
   role: UserRole;
   status: UserStatus;
-  created_at: string;
-  updated_at: string;
+  CreatedAt: string;
+  UpdatedAt: string;
 }
 
 // 分页用户响应

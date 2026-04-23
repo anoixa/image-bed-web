@@ -268,10 +268,10 @@ export default function Users() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        {formatDate(user.created_at)}
+                        {formatDate(user.CreatedAt)}
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        {formatDate(user.updated_at)}
+                        {formatDate(user.UpdatedAt)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
