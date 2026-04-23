@@ -66,8 +66,14 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const checkAndRefreshToken = useAuthStore((state) => state.checkAndRefreshToken);
+  const initAuth = useAuthStore((state) => state.initAuth);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const lastVisibilityCheck = useRef<number>(0);
+
+  // 应用初始化：恢复认证状态并获取用户信息
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {

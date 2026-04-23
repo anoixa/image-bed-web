@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User } from '@/types';
-import { login as loginApi, logout as logoutApi, refreshToken as refreshTokenApi } from '@/api/auth';
+import {
+  login as loginApi,
+  logout as logoutApi,
+  refreshToken as refreshTokenApi,
+  getCurrentUser,
+} from '@/api/auth';
 
 interface AuthState {
   user: User | null;
@@ -16,6 +21,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<boolean>;
   checkAndRefreshToken: () => Promise<boolean>;
+  initAuth: () => Promise<void>;
   // Debug
   forceExpireToken: () => void;
 }
@@ -40,7 +46,9 @@ export const useAuthStore = create<AuthState>()(
 
           const token = response.access_token.replace('Bearer ', '');
           const expiry = response.access_token_expiry * 1000; // 转换为毫秒时间戳
-          const user: User = response.user ?? { id: 1, username };
+
+          // 通过 /api/auth/me 获取完整用户信息
+          const user = await getCurrentUser();
 
           set({
             user,
@@ -49,7 +57,6 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
-
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -86,13 +93,16 @@ export const useAuthStore = create<AuthState>()(
           const token = response.access_token.replace('Bearer ', '');
           const expiry = response.access_token_expiry * 1000;
 
-          set((state) => ({
+          // 刷新后重新获取用户信息
+          const user = await getCurrentUser();
+
+          set({
             accessToken: token,
             accessTokenExpiry: expiry,
             isAuthenticated: true,
             isRefreshing: false,
-            user: response.user ?? state.user,
-          }));
+            user,
+          });
 
           return true;
         } catch (error) {
@@ -128,6 +138,49 @@ export const useAuthStore = create<AuthState>()(
         }
 
         return await refreshAccessToken();
+      },
+
+      initAuth: async () => {
+        const { accessToken, accessTokenExpiry, refreshAccessToken } = get();
+
+        // 如果没有 token，不做任何事
+        if (!accessToken || !accessTokenExpiry) {
+          return;
+        }
+
+        const now = Date.now();
+        const timeUntilExpiry = accessTokenExpiry - now;
+
+        // Token 已过期，尝试刷新
+        if (timeUntilExpiry <= 0) {
+          const ok = await refreshAccessToken();
+          if (!ok) {
+            set({
+              user: null,
+              accessToken: null,
+              accessTokenExpiry: null,
+              isAuthenticated: false,
+            });
+          }
+          return;
+        }
+
+        // Token 有效，直接获取用户信息
+        try {
+          const user = await getCurrentUser();
+          set({
+            user,
+            isAuthenticated: true,
+          });
+        } catch {
+          // /me 失败（如 401），清除状态
+          set({
+            user: null,
+            accessToken: null,
+            accessTokenExpiry: null,
+            isAuthenticated: false,
+          });
+        }
       },
     }),
     {

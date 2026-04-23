@@ -1,9 +1,14 @@
-import { post } from '@/lib/request';
-import type { LoginResponse } from '@/types';
+import { get, post } from '@/lib/request';
+import type { LoginResponse, User } from '@/types';
 
 // 登录
 export const login = (username: string, password: string): Promise<LoginResponse> => {
   return post<LoginResponse>('/api/auth/login', { username, password });
+};
+
+// 获取当前用户信息
+export const getCurrentUser = (): Promise<User> => {
+  return get<User>('/api/auth/me');
 };
 
 // 刷新 Token - 使用 HttpOnly Cookie 中的 refresh_token
