@@ -121,10 +121,16 @@ async function performTokenRefresh(): Promise<string> {
     return newToken;
   } catch (error) {
     // 刷新失败，拒绝所有等待的请求
+    const errMessage = error instanceof Error ? error.message : 'Token 刷新失败';
     refreshSubscribers.forEach(({ reject }) =>
-      reject(error instanceof Error ? error : new Error('Token 刷新失败'))
+      reject(new Error(errMessage))
     );
     refreshSubscribers = [];
+
+    // 如果是账户被禁用，在跳转前记录标记，供登录页展示
+    if (errMessage.toLowerCase().includes('account disabled')) {
+      sessionStorage.setItem('auth_error', 'account_disabled');
+    }
 
     clearAuthState();
     throw error;

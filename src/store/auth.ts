@@ -10,7 +10,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isRefreshing: boolean;
-  
+
   // Actions
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -37,11 +37,11 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const response = await loginApi(username, password);
-          
+
           const token = response.access_token.replace('Bearer ', '');
           const expiry = response.access_token_expiry * 1000; // 转换为毫秒时间戳
-          const user: User = { id: 1, username };
-          
+          const user: User = response.user ?? { id: 1, username };
+
           set({
             user,
             accessToken: token,
@@ -49,7 +49,7 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: true,
             isLoading: false,
           });
-          
+
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -73,26 +73,27 @@ export const useAuthStore = create<AuthState>()(
 
       refreshAccessToken: async (): Promise<boolean> => {
         const { isRefreshing } = get();
-        
+
         if (isRefreshing) {
           return false;
         }
-        
+
         set({ isRefreshing: true });
-        
+
         try {
           const response = await refreshTokenApi();
-          
+
           const token = response.access_token.replace('Bearer ', '');
           const expiry = response.access_token_expiry * 1000;
-          
-          set({
+
+          set((state) => ({
             accessToken: token,
             accessTokenExpiry: expiry,
             isAuthenticated: true,
             isRefreshing: false,
-          });
-          
+            user: response.user ?? state.user,
+          }));
+
           return true;
         } catch (error) {
           set({
@@ -114,18 +115,18 @@ export const useAuthStore = create<AuthState>()(
 
       checkAndRefreshToken: async (): Promise<boolean> => {
         const { accessToken, accessTokenExpiry, refreshAccessToken } = get();
-        
+
         if (!accessToken || !accessTokenExpiry) {
           return false;
         }
-        
+
         const now = Date.now();
         const timeUntilExpiry = accessTokenExpiry - now;
-        
+
         if (timeUntilExpiry > TOKEN_REFRESH_THRESHOLD) {
           return true;
         }
-        
+
         return await refreshAccessToken();
       },
     }),

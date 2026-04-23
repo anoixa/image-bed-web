@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw, ImageIcon, Folder, Users, HardDrive, TrendingUp } from 'lucide-react';
 import { fetchDashboardStats, refreshDashboardStats } from '@/api/dashboard';
 import type { DashboardStats, StorageStat } from '@/types';
+import { useAuthStore } from '@/store/auth';
 import { toast } from '@/components/ui/use-toast';
 
 export default function Dashboard() {
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const wasHidden = useRef(false);
+  const isAdmin = useAuthStore((state) => state.user?.role === 'admin');
 
   const loadStats = async (silent = false) => {
     try {
@@ -84,8 +86,8 @@ export default function Dashboard() {
             <p className="text-slate-500 mt-1">系统概览与统计</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
+          {Array.from({ length: isAdmin ? 4 : 3 }).map((_, i) => (
             <Card key={i} className="animate-pulse">
               <CardContent className="p-6 h-32 bg-slate-100" />
             </Card>
@@ -129,7 +131,7 @@ export default function Dashboard() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${isAdmin ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         <StatCard
           icon={ImageIcon}
           label="图片总数"
@@ -145,13 +147,15 @@ export default function Dashboard() {
           color="text-purple-600"
           bgColor="bg-purple-50"
         />
-        <StatCard
-          icon={Users}
-          label="用户数量"
-          value={overview.users.total}
-          color="text-emerald-600"
-          bgColor="bg-emerald-50"
-        />
+        {isAdmin && (
+          <StatCard
+            icon={Users}
+            label="用户数量"
+            value={overview.users.total}
+            color="text-emerald-600"
+            bgColor="bg-emerald-50"
+          />
+        )}
         <StatCard
           icon={HardDrive}
           label="存储占用"

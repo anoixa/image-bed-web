@@ -15,6 +15,7 @@ const Tokens = lazy(() => import('@/pages/Tokens'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const StorageConfigs = lazy(() => import('@/pages/StorageConfigs'));
 const ApiDocs = lazy(() => import('@/pages/ApiDocs'));
+const Users = lazy(() => import('@/pages/Users'));
 
 // Loading fallback component
 function PageLoader() {
@@ -28,22 +29,38 @@ function PageLoader() {
 // 受保护的路由组件
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
+  return <>{children}</>;
+}
+
+// 仅管理员可访问的路由
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
 
 // 公开路由（已登录用户重定向到首页）
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
@@ -91,6 +108,11 @@ function App() {
             <Route path="stats" element={<Dashboard />} />
             <Route path="albums" element={<Albums />} />
             <Route path="tokens" element={<Tokens />} />
+            <Route path="users" element={
+              <AdminRoute>
+                <Users />
+              </AdminRoute>
+            } />
             <Route path="settings" element={<Settings />} />
             <Route path="storage" element={<StorageConfigs />} />
             <Route path="api-docs" element={<ApiDocs />} />

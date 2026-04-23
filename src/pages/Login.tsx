@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,19 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // 检测 sessionStorage 中由 request.ts 标记的刷新失败禁用状态
+  useEffect(() => {
+    const authError = sessionStorage.getItem('auth_error');
+    if (authError === 'account_disabled') {
+      sessionStorage.removeItem('auth_error');
+      toast({
+        title: '账户已禁用',
+        description: '账户已被禁用，请联系管理员。',
+        variant: 'destructive',
+      });
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,9 +56,13 @@ export default function Login() {
       });
       setTimeout(() => navigate('/'), 300);
     } catch (error) {
+      const message = error instanceof Error ? error.message : '请检查用户名和密码';
+      const isDisabled = message.toLowerCase().includes('account disabled');
       toast({
-        title: '登录失败',
-        description: error instanceof Error ? error.message : '请检查用户名和密码',
+        title: isDisabled ? '账户已禁用' : '登录失败',
+        description: isDisabled
+          ? '账户已被禁用，请联系管理员。'
+          : message,
         variant: 'destructive',
       });
     } finally {

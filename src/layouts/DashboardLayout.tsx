@@ -24,6 +24,7 @@ import {
   Cloud,
   ChevronLeft,
   ChevronRight,
+  Shield,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
 import { setDefaultStorageConfig } from '@/api/configs';
@@ -54,13 +55,15 @@ interface NavItem {
   path: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
 }
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   { path: '/', label: '全部图片', icon: ImageIcon },
   { path: '/stats', label: '统计大屏', icon: BarChart3 },
   { path: '/albums', label: '相册管理', icon: Folder },
   { path: '/tokens', label: 'API Token', icon: Key },
+  { path: '/users', label: '用户管理', icon: Shield, adminOnly: true },
   { path: '/storage', label: '存储配置', icon: Database },
   { path: '/api-docs', label: 'API 文档', icon: BookOpen },
   { path: '/settings', label: '系统设置', icon: Settings },
@@ -97,6 +100,10 @@ function NavItemLink({ item, onNavigate, collapsed = false }: { item: NavItem; o
 }
 
 function Sidebar({ onNavigate, collapsed, onToggleCollapse }: { onNavigate?: () => void; collapsed?: boolean; onToggleCollapse?: () => void }) {
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'admin';
+  const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
+
   return (
     <div className="flex flex-col h-full bg-white border-r border-slate-200/60 relative">
       <div className={`p-6 flex items-center gap-3 ${collapsed ? 'justify-center p-4' : ''}`}>
@@ -180,6 +187,7 @@ export default function DashboardLayout() {
   // 本地输入状态，避免中文输入法问题
   const [inputValue, setInputValue] = useState(searchQuery);
   const logout = useAuthStore((state) => state.logout);
+  const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
 
   // 修改密码弹窗状态
@@ -492,7 +500,30 @@ export default function DashboardLayout() {
                     <User className="w-5 h-5 text-slate-500" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-2">
+                    <p className="text-sm font-medium text-slate-900">{user?.username}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {user?.role && (
+                        <Badge
+                          variant={user.role === 'admin' ? 'default' : 'secondary'}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {user.role === 'admin' ? '管理员' : '普通用户'}
+                        </Badge>
+                      )}
+                      {user?.status && (
+                        <span className={`text-[10px] px-1.5 py-0 rounded-full border ${
+                          user.status === 'active'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-red-50 text-red-700 border-red-200'
+                        }`}>
+                          {user.status === 'active' ? '正常' : '已禁用'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => setIsPasswordDialogOpen(true)}
                     className="cursor-pointer"

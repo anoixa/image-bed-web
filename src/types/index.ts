@@ -112,12 +112,68 @@ export interface CreateTokenResponse {
 export interface LoginResponse {
   access_token: string;
   access_token_expiry: number;
+  user?: User;
 }
+
+// 用户角色与状态
+export type UserRole = 'admin' | 'user';
+export type UserStatus = 'active' | 'disabled';
 
 // 用户
 export interface User {
   id: number;
   username: string;
+  role?: UserRole;
+  status?: UserStatus;
+}
+
+// 用户列表项
+export interface UserListItem {
+  id: number;
+  username: string;
+  role: UserRole;
+  status: UserStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+// 分页用户响应
+export interface PaginatedUsersResponse {
+  users: UserListItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// 创建用户请求
+export interface CreateUserRequest {
+  username: string;
+  password?: string;
+  role?: UserRole;
+}
+
+// 创建用户响应
+export interface CreateUserResponse {
+  id: number;
+  username: string;
+  role: UserRole;
+  status: UserStatus;
+  password?: string;
+}
+
+// 更新角色请求
+export interface UpdateRoleRequest {
+  role: UserRole;
+}
+
+// 更新状态请求
+export interface UpdateStatusRequest {
+  status: UserStatus;
+}
+
+// 重置密码响应
+export interface ResetPasswordResponse {
+  password: string;
 }
 
 // 上传配置
