@@ -11,6 +11,8 @@ import {
   Copy,
   Check,
   UserCog,
+  Link2,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,10 +34,22 @@ import {
   updateUserStatus,
   resetUserPassword,
   deleteUser,
+  getUserOAuthIdentities,
+  createOAuthInvite,
+  deleteOAuthInvite,
 } from '@/api/admin';
-import type { UserListItem, UserRole, UserStatus } from '@/types';
+import type { UserListItem, UserRole, UserStatus, OAuthIdentity, OAuthInvite } from '@/types';
 
 const PAGE_SIZE = 20;
+
+function getProviderLabel(provider: string): string {
+  switch (provider.toLowerCase()) {
+    case 'github': return 'GitHub';
+    case 'google': return 'Google';
+    case 'gitee': return 'Gitee';
+    default: return provider;
+  }
+}
 
 export default function Users() {
   const [users, setUsers] = useState<UserListItem[]>([]);
@@ -52,6 +66,10 @@ export default function Users() {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [targetUser, setTargetUser] = useState<UserListItem | null>(null);
+
+  // OAuth 管理弹窗
+  const [oauthManageOpen, setOauthManageOpen] = useState(false);
+  const [oauthManageUser, setOauthManageUser] = useState<UserListItem | null>(null);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -154,6 +172,11 @@ export default function Users() {
       setDeleteConfirmOpen(false);
       setTargetUser(null);
     }
+  };
+
+  const openOAuthManage = (user: UserListItem) => {
+    setOauthManageUser(user);
+    setOauthManageOpen(true);
   };
 
   return (
@@ -278,6 +301,15 @@ export default function Users() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => openOAuthManage(user)}
+                            className="h-8 px-2 text-slate-600 hover:text-indigo-600"
+                            title="OAuth 管理"
+                          >
+                            <Link2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => openResetConfirm(user)}
                             className="h-8 px-2 text-slate-600 hover:text-indigo-600"
                             title="重置密码"
@@ -349,6 +381,13 @@ export default function Users() {
         onOpenChange={setPasswordResultOpen}
         title={passwordResultTitle}
         password={passwordResult}
+      />
+
+      {/* OAuth Manage Dialog */}
+      <OAuthManageDialog
+        open={oauthManageOpen}
+        onOpenChange={setOauthManageOpen}
+        user={oauthManageUser}
       />
 
       {/* Reset Password Confirm */}
@@ -587,6 +626,360 @@ function PasswordResultDialog({ open, onOpenChange, title, password }: PasswordR
           </p>
           <div className="flex justify-end">
             <Button onClick={() => onOpenChange(false)}>我知道了</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ==================== OAuth Manage Dialog ====================
+
+interface OAuthManageDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user: UserListItem | null;
+}
+
+function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps) {
+  const [identities, setIdentities] = useState<OAuthIdentity[]>([]);
+  const [invites, setInvites] = useState<OAuthInvite[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [createInviteOpen, setCreateInviteOpen] = useState(false);
+  const [deleteInviteId, setDeleteInviteId] = useState<number | null>(null);
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const res = await getUserOAuthIdentities(user.id);
+      setIdentities(res.identities || []);
+      setInvites(res.invites || []);
+    } catch (error) {
+      toast({
+        title: '加载失败',
+        description: error instanceof Error ? error.message : '获取 OAuth 信息失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (open && user) {
+      loadData();
+    }
+  }, [open, user, loadData]);
+
+  const handleDeleteInvite = async () => {
+    if (!user || !deleteInviteId) return;
+    try {
+      await deleteOAuthInvite(user.id, deleteInviteId);
+      toast({ title: '邀请已删除' });
+      setInvites((prev) => prev.filter((i) => i.id !== deleteInviteId));
+    } catch (error) {
+      toast({
+        title: '删除失败',
+        description: error instanceof Error ? error.message : '删除邀请失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteInviteId(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-indigo-600" />
+            OAuth 管理 - {user?.username}
+          </DialogTitle>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+          </div>
+        ) : (
+          <div className="space-y-6 pt-2">
+            {/* 已绑定身份 */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                <User className="h-4 w-4" />
+                已绑定身份 ({identities.length})
+              </h3>
+              {identities.length === 0 ? (
+                <p className="text-sm text-slate-400 py-2">暂无绑定身份</p>
+              ) : (
+                <div className="space-y-2">
+                  {identities.map((identity) => (
+                    <div
+                      key={identity.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        {identity.avatar_url ? (
+                          <img
+                            src={identity.avatar_url}
+                            alt=""
+                            className="w-8 h-8 rounded-full"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <User className="w-4 h-4 text-indigo-600" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">
+                            {identity.username || identity.email || identity.subject}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-xs">
+                              {getProviderLabel(identity.provider)}
+                            </Badge>
+                            <span className="text-xs text-slate-400">ID: {identity.subject}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 邀请列表 */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  OAuth 邀请 ({invites.length})
+                </h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCreateInviteOpen(true)}
+                  className="gap-1"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  创建邀请
+                </Button>
+              </div>
+
+              {invites.length === 0 ? (
+                <p className="text-sm text-slate-400 py-2">暂无邀请</p>
+              ) : (
+                <div className="space-y-2">
+                  {invites.map((invite) => (
+                    <div
+                      key={invite.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {getProviderLabel(invite.provider)}
+                          </Badge>
+                          {invite.used_at ? (
+                            <Badge variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200">
+                              已使用
+                            </Badge>
+                          ) : new Date(invite.expires_at) < new Date() ? (
+                            <Badge variant="secondary" className="text-xs bg-red-50 text-red-700 border-red-200">
+                              已过期
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                              待使用
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {invite.subject && <span className="mr-2">Subject: {invite.subject}</span>}
+                          {invite.email && <span>Email: {invite.email}</span>}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          过期: {new Date(invite.expires_at).toLocaleString('zh-CN')}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteInviteId(invite.id)}
+                        className="h-8 px-2 text-slate-500 hover:text-red-600"
+                        disabled={!!invite.used_at}
+                        title={invite.used_at ? '已使用的邀请无法删除' : '删除邀请'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Create Invite Dialog */}
+        <CreateOAuthInviteDialog
+          open={createInviteOpen}
+          onOpenChange={setCreateInviteOpen}
+          userId={user?.id ?? 0}
+          onSuccess={(invite) => {
+            setInvites((prev) => [...prev, invite]);
+            toast({ title: '邀请创建成功' });
+          }}
+        />
+
+        {/* Delete Invite Confirm */}
+        <ConfirmDialog
+          open={!!deleteInviteId}
+          onOpenChange={(open) => !open && setDeleteInviteId(null)}
+          title="删除邀请"
+          description="确定要删除这个 OAuth 邀请吗？"
+          onConfirm={handleDeleteInvite}
+          confirmText="删除"
+          variant="destructive"
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ==================== Create OAuth Invite Dialog ====================
+
+interface CreateOAuthInviteDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userId: number;
+  onSuccess: (invite: OAuthInvite) => void;
+}
+
+function CreateOAuthInviteDialog({ open, onOpenChange, userId, onSuccess }: CreateOAuthInviteDialogProps) {
+  const [provider, setProvider] = useState('github');
+  const [subject, setSubject] = useState('');
+  const [email, setEmail] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resetForm = () => {
+    setProvider('github');
+    setSubject('');
+    setEmail('');
+    setExpiresAt('');
+  };
+
+  const handleSubmit = async () => {
+    if (!subject.trim() && !email.trim()) {
+      toast({ title: '请至少填写 Subject 或 Email', variant: 'destructive' });
+      return;
+    }
+    if (!expiresAt) {
+      toast({ title: '请选择过期时间', variant: 'destructive' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await createOAuthInvite(userId, {
+        provider,
+        subject: subject.trim(),
+        email: email.trim(),
+        expires_at: new Date(expiresAt).toISOString(),
+      });
+      onSuccess(res);
+      onOpenChange(false);
+      resetForm();
+    } catch (error) {
+      toast({
+        title: '创建失败',
+        description: error instanceof Error ? error.message : '创建邀请失败',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 默认过期时间：30 天后
+  useEffect(() => {
+    if (open && !expiresAt) {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      setExpiresAt(d.toISOString().slice(0, 16));
+    }
+  }, [open, expiresAt]);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5 text-indigo-600" />
+            创建 OAuth 邀请
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Provider</label>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-md px-3 py-2 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+              <option value="github">GitHub</option>
+              <option value="google">Google</option>
+              <option value="gitee">Gitee</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Subject</label>
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="外部账号 ID（优先）"
+            />
+            <p className="text-xs text-slate-400">Provider 返回的唯一用户标识。Gitee 建议优先使用此字段。</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Email</label>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="邮箱地址"
+            />
+            <p className="text-xs text-slate-400">仅在 Provider 返回 email_verified=true 时生效。</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">过期时间</label>
+            <Input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="outline" onClick={() => { onOpenChange(false); resetForm(); }}>
+              取消
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  创建中...
+                </>
+              ) : (
+                '创建'
+              )}
+            </Button>
           </div>
         </div>
       </DialogContent>

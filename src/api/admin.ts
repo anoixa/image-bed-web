@@ -6,6 +6,9 @@ import type {
   UpdateRoleRequest,
   UpdateStatusRequest,
   ResetPasswordResponse,
+  UserOAuthIdentitiesResponse,
+  CreateOAuthInviteRequest,
+  OAuthInvite,
 } from '@/types';
 
 // 获取用户列表（分页）
@@ -41,4 +44,21 @@ export const resetUserPassword = (id: number): Promise<ResetPasswordResponse> =>
 // 删除用户
 export const deleteUser = (id: number): Promise<void> => {
   return del<void>(`/api/v1/admin/users/${id}`);
+};
+
+// ==================== OAuth 管理 ====================
+
+// 查看用户 OAuth 身份和邀请
+export const getUserOAuthIdentities = (id: number): Promise<UserOAuthIdentitiesResponse> => {
+  return get<UserOAuthIdentitiesResponse>(`/api/v1/admin/users/${id}/oauth-identities`);
+};
+
+// 创建 OAuth 邀请
+export const createOAuthInvite = (id: number, data: CreateOAuthInviteRequest): Promise<OAuthInvite> => {
+  return post<OAuthInvite>(`/api/v1/admin/users/${id}/oauth-invites`, data);
+};
+
+// 删除 OAuth 邀请
+export const deleteOAuthInvite = (id: number, inviteId: number): Promise<{ message: string }> => {
+  return del<{ message: string }>(`/api/v1/admin/users/${id}/oauth-invites/${inviteId}`);
 };

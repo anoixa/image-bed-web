@@ -350,7 +350,7 @@ export interface StorageStat {
 }
 
 // 配置分类
-export type ConfigCategory = 'storage' | 'jwt' | 'system' | 'image_processing' | 'security';
+export type ConfigCategory = 'storage' | 'jwt' | 'system' | 'image_processing' | 'security' | 'oauth';
 
 // 存储配置
 export interface StorageConfig {
@@ -487,3 +487,78 @@ export interface ConversionConfig {
 
 // 更新转换配置请求（排除只读字段 avif_supported）
 export type UpdateConversionRequest = Partial<Omit<ConversionConfig, 'avif_supported'>>;
+
+// ==================== OAuth 类型 ====================
+
+// OAuth Provider
+export interface OAuthProvider {
+  provider: string;
+  display_name: string;
+  icon: string;
+  enabled: boolean;
+}
+
+// 登录能力
+export interface AuthCapabilities {
+  password_login_enabled: boolean;
+  oauth_login_enabled: boolean;
+  providers: OAuthProvider[];
+}
+
+// OAuth 身份
+export interface OAuthIdentity {
+  id: number;
+  user_id: number;
+  provider: string;
+  subject: string;
+  username: string;
+  email: string;
+  email_verified: boolean;
+  avatar_url: string;
+}
+
+// OAuth 邀请
+export interface OAuthInvite {
+  id: number;
+  user_id: number;
+  provider: string;
+  subject: string;
+  email: string;
+  created_by: number;
+  expires_at: string;
+  used_at: string | null;
+  created_at?: string;
+}
+
+// 用户 OAuth 身份和邀请响应
+export interface UserOAuthIdentitiesResponse {
+  identities: OAuthIdentity[];
+  invites: OAuthInvite[];
+}
+
+// 创建 OAuth 邀请请求
+export interface CreateOAuthInviteRequest {
+  provider: string;
+  subject: string;
+  email: string;
+  expires_at: string;
+}
+
+// OAuth 配置（用于管理员配置 providers）
+export interface OAuthConfig {
+  provider: string;
+  client_id: string;
+  client_secret: string;
+}
+
+// 通用配置项（扩展 StorageConfig 以支持 oauth category）
+export interface OAuthProviderConfig {
+  id: number;
+  name: string;
+  category: 'oauth';
+  is_enabled: boolean;
+  config: OAuthConfig;
+  created_at: string;
+  updated_at: string;
+  description?: string;
+}

@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
+  UserCog,
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
 import { setDefaultStorageConfig } from '@/api/configs';
@@ -67,6 +68,7 @@ const allNavItems: NavItem[] = [
   { path: '/storage', label: '存储配置', icon: Database },
   { path: '/api-docs', label: 'API 文档', icon: BookOpen },
   { path: '/settings', label: '系统设置', icon: Settings },
+  { path: '/account', label: '账号设置', icon: UserCog },
 ];
 
 // 导航项链接组件 - 保留 URL 查询参数
@@ -524,6 +526,13 @@ export default function DashboardLayout() {
                     </div>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => navigate('/account')}
+                    className="cursor-pointer"
+                  >
+                    <UserCog className="mr-2 h-4 w-4" />
+                    账号设置
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => setIsPasswordDialogOpen(true)}
                     className="cursor-pointer"
