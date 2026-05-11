@@ -7,13 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/store/auth';
-import { getOAuthIdentities, unlinkOAuthIdentity, getAuthCapabilities } from '@/api/auth';
+import { getOAuthIdentities, unlinkOAuthIdentity, getAuthCapabilities, startOAuthLink } from '@/api/auth';
 import type { OAuthIdentity, AuthCapabilities } from '@/types';
 
 const OAUTH_LINK_ERROR_MESSAGES: Record<string, string> = {
   already_bound: 'OAuth 账号已绑定其他用户。',
   disabled: '账号已被禁用。',
   invalid_state: '绑定状态已过期，请重试。',
+  missing_code: 'Provider 回调未返回授权码，请重试。',
   internal: '绑定失败，请稍后重试。',
 };
 
@@ -87,9 +88,21 @@ export default function Account() {
     }
   }, [searchParams, setSearchParams, loadData]);
 
-  const handleLink = (provider: string) => {
-    const returnTo = encodeURIComponent('/account');
-    window.location.href = `/api/auth/oauth/${provider}/link/start?return_to=${returnTo}`;
+  const handleLink = async (provider: string) => {
+    try {
+      const data = await startOAuthLink(provider, '/account');
+      if (data.auth_url) {
+        window.location.assign(data.auth_url);
+        return;
+      }
+      throw new Error('Failed to start OAuth binding');
+    } catch (error) {
+      toast({
+        title: '绑定启动失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleUnlink = async (identity: OAuthIdentity) => {
@@ -101,18 +114,32 @@ export default function Account() {
     } catch (error) {
       const message = error instanceof Error ? error.message : '解绑失败';
       const isConflict = message.includes('409') || message.includes('最后一个');
+      const isNotFound = message.includes('404') || message.includes('Identity not found');
       toast({
-        title: isConflict ? '无法解绑' : '解绑失败',
+        title: isConflict ? '无法解绑' : isNotFound ? '解绑失败' : '解绑失败',
         description: isConflict
           ? '不能解绑最后一个登录方式，请先设置密码或绑定其他 OAuth。'
-          : message,
+          : isNotFound
+            ? '该 OAuth 身份未找到，可能已解绑。'
+            : message,
         variant: 'destructive',
       });
+      if (isNotFound) {
+        // 如果后端说找不到，前端也同步移除
+        setIdentities((prev) => prev.filter((i) => i.id !== identity.id));
+      }
     } finally {
       setUnlinkingProvider(null);
       setConfirmUnlink(null);
     }
   };
+
+  // 如果密码登录被禁用且只有一个 OAuth 身份，不允许解绑
+  const canUnlink = !(
+    capabilities &&
+    !capabilities.password_login_enabled &&
+    identities.length === 1
+  );
 
   const availableProviders = capabilities?.providers?.filter(
     (p) => p.enabled && !identities.some((i) => i.provider === p.provider)
@@ -231,7 +258,7 @@ export default function Account() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setConfirmUnlink(identity)}
-                          disabled={unlinkingProvider === identity.provider}
+                          disabled={unlinkingProvider === identity.provider || !canUnlink}
                           className="text-slate-500 hover:text-red-600"
                         >
                           {unlinkingProvider === identity.provider ? (

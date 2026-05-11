@@ -47,3 +47,8 @@ export const getOAuthIdentities = (): Promise<{ identities: OAuthIdentity[] }> =
 export const unlinkOAuthIdentity = (provider: string): Promise<void> => {
   return del(`/api/auth/oauth/identities/${provider}`);
 };
+
+// 启动 OAuth 绑定（JSON 模式）
+export const startOAuthLink = (provider: string, returnTo: string): Promise<{ auth_url: string }> => {
+  return post<{ auth_url: string }>(`/api/auth/oauth/${provider}/link/start?return_to=${encodeURIComponent(returnTo)}&response=json`);
+};

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useRef, Suspense, lazy } from 'react';
+import { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { Toaster } from '@/components/ui/toaster';
 import HttpsWarning from '@/components/HttpsWarning';
@@ -69,11 +69,12 @@ function App() {
   const checkAndRefreshToken = useAuthStore((state) => state.checkAndRefreshToken);
   const initAuth = useAuthStore((state) => state.initAuth);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [initialized, setInitialized] = useState(false);
   const lastVisibilityCheck = useRef<number>(0);
 
   // 应用初始化：恢复认证状态并获取用户信息
   useEffect(() => {
-    initAuth();
+    initAuth().then(() => setInitialized(true));
   }, [initAuth]);
 
   useEffect(() => {
@@ -90,6 +91,10 @@ function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [checkAndRefreshToken, isAuthenticated]);
+
+  if (!initialized) {
+    return <PageLoader />;
+  }
 
   return (
     <BrowserRouter>

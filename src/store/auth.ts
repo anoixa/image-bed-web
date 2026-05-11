@@ -143,13 +143,23 @@ export const useAuthStore = create<AuthState>()(
       initAuth: async () => {
         const { accessToken, accessTokenExpiry, refreshAccessToken } = get();
 
-        // 如果没有 token，不做任何事
-        if (!accessToken || !accessTokenExpiry) {
+        // 如果没有 accessToken，尝试用 refresh_token cookie 刷新一次
+        // （OAuth 登录后后端只设置了 refresh_token cookie）
+        if (!accessToken) {
+          const ok = await refreshAccessToken();
+          if (!ok) {
+            set({
+              user: null,
+              accessToken: null,
+              accessTokenExpiry: null,
+              isAuthenticated: false,
+            });
+          }
           return;
         }
 
         const now = Date.now();
-        const timeUntilExpiry = accessTokenExpiry - now;
+        const timeUntilExpiry = accessTokenExpiry! - now;
 
         // Token 已过期，尝试刷新
         if (timeUntilExpiry <= 0) {

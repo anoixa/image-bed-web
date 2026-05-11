@@ -515,6 +515,7 @@ export interface OAuthIdentity {
   email: string;
   email_verified: boolean;
   avatar_url: string;
+  created_at?: string;
 }
 
 // OAuth 邀请

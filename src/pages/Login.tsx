@@ -14,6 +14,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   disabled: '账号已被禁用。',
   invalid_state: '登录状态已过期，请重试。',
   already_bound: 'OAuth 账号已绑定其他用户。',
+  missing_code: 'Provider 回调未返回授权码，请重试。',
   internal: '登录失败，请稍后重试。',
 };
 
@@ -158,7 +159,7 @@ export default function Login() {
   };
 
   const handleOAuthLogin = (provider: string) => {
-    const returnTo = encodeURIComponent('/dashboard');
+    const returnTo = encodeURIComponent('/');
     window.location.href = `/api/auth/oauth/${provider}/start?return_to=${returnTo}`;
   };
 
