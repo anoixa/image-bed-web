@@ -1,4 +1,4 @@
-import { get, post, del } from '@/lib/request';
+import { get, post, put, del } from '@/lib/request';
 import type { LoginResponse, User, AuthCapabilities, OAuthProvider, OAuthIdentity } from '@/types';
 
 // 登录
@@ -51,4 +51,28 @@ export const unlinkOAuthIdentity = (provider: string): Promise<void> => {
 // 启动 OAuth 绑定（JSON 模式）
 export const startOAuthLink = (provider: string, returnTo: string): Promise<{ auth_url: string }> => {
   return post<{ auth_url: string }>(`/api/auth/oauth/${provider}/link/start?return_to=${encodeURIComponent(returnTo)}&response=json`);
+};
+
+// ==================== Admin Auth Settings ====================
+
+export interface AuthSettings {
+  password_login_enabled: boolean;
+  oauth_login_enabled: boolean;
+  providers: OAuthProvider[];
+  callback_urls: Record<string, string>;
+}
+
+export interface UpdateAuthSettingsRequest {
+  password_login_enabled?: boolean;
+  oauth_login_enabled?: boolean;
+}
+
+// 获取管理员登录设置
+export const fetchAuthSettings = (): Promise<AuthSettings> => {
+  return get<AuthSettings>('/api/v1/admin/auth/settings');
+};
+
+// 更新管理员登录设置
+export const updateAuthSettings = (data: UpdateAuthSettingsRequest): Promise<AuthSettings> => {
+  return put<AuthSettings>('/api/v1/admin/auth/settings', data);
 };

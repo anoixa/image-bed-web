@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder, RefreshCw, Cpu, AlertTriangle, Zap, Activity } from 'lucide-react';
+import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder, RefreshCw, Cpu, AlertTriangle, Zap, Activity, Shield } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { fetchSystemStatus, fetchConversionConfig, updateConversionConfig } from '@/api/system';
+import { fetchAuthSettings, updateAuthSettings } from '@/api/auth';
+import type { AuthSettings } from '@/api/auth';
 import { fetchAlbums } from '@/api/albums';
 import {
   fetchStorageConfigs,
@@ -22,7 +24,9 @@ import {
   setDefaultStorageConfig,
   testStorageConfig,
   fetchTransferMode,
-  updateTransferMode
+  updateTransferMode,
+  enableStorageConfig,
+  disableStorageConfig,
 } from '@/api/configs';
 import {
   fetchRandomSourceAlbum,
@@ -33,6 +37,8 @@ import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import OAuthConfigManager from '@/components/OAuthConfigManager';
+import { useAuthStore } from '@/store/auth';
 
 export default function Settings() {
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
@@ -582,10 +588,11 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="general">通用设置</TabsTrigger>
           <TabsTrigger value="transfer">传输设置</TabsTrigger>
           <TabsTrigger value="background">登录背景</TabsTrigger>
+          <TabsTrigger value="auth">登录设置</TabsTrigger>
           <TabsTrigger value="system">系统信息</TabsTrigger>
         </TabsList>
 
@@ -1047,6 +1054,12 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
+        {/* 登录设置 */}
+        <TabsContent value="auth" className="space-y-6">
+          <OAuthConfigManager />
+          <AuthSettingsManager />
+        </TabsContent>
+
         {/* 系统信息 */}
         <TabsContent value="system" className="space-y-6">
           <Card>
@@ -1325,5 +1338,170 @@ export default function Settings() {
         variant={confirmDialog.variant}
       />
     </div>
+  );
+}
+
+// 登录设置管理（密码登录开关等）
+function AuthSettingsManager() {
+  const [settings, setSettings] = useState<AuthSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [confirmDisablePassword, setConfirmDisablePassword] = useState(false);
+  const user = useAuthStore((state) => state.user);
+
+  const loadSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchAuthSettings();
+      setSettings(data);
+    } catch (error) {
+      toast({
+        title: '加载登录设置失败',
+        description: error instanceof Error ? error.message : '请稍后重试',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleTogglePasswordLogin = async (enabled: boolean) => {
+    if (!settings) return;
+    // 关闭密码登录前确认
+    if (!enabled) {
+      setConfirmDisablePassword(true);
+      return;
+    }
+    await savePasswordLogin(true);
+  };
+
+  const savePasswordLogin = async (enabled: boolean) => {
+    if (!settings) return;
+    setSaving(true);
+    try {
+      const updated = await updateAuthSettings({ password_login_enabled: enabled });
+      setSettings(updated);
+      toast({
+        title: enabled ? '密码登录已开启' : '密码登录已关闭',
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '请稍后重试';
+      toast({
+        title: '保存失败',
+        description: msg,
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="h-5 w-5" />
+            登录方式设置
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* 密码登录开关 */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <label className="text-sm font-medium">启用密码登录</label>
+              <p className="text-xs text-slate-500">
+                关闭后，用户只能通过 OAuth 方式登录。请确保至少有一个 OAuth Provider 已启用，且您本人已绑定 OAuth 账号。
+              </p>
+            </div>
+            <Switch
+              checked={settings?.password_login_enabled ?? true}
+              onCheckedChange={handleTogglePasswordLogin}
+              disabled={saving}
+            />
+          </div>
+
+          <div className="border-t border-slate-200" />
+
+          {/* 当前 OAuth Provider 状态 */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">OAuth Provider 状态</label>
+            <div className="space-y-2">
+              {settings?.providers && settings.providers.length > 0 ? (
+                settings.providers.map((p) => (
+                  <div
+                    key={p.provider}
+                    className="flex items-center justify-between p-2 bg-slate-50 rounded border border-slate-100"
+                  >
+                    <span className="text-sm">{p.display_name || p.provider}</span>
+                    <Badge variant={p.enabled ? 'default' : 'secondary'}>
+                      {p.enabled ? '启用' : '禁用'}
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-slate-500">
+                  尚未配置 OAuth Provider，请到上方「OAuth Provider 配置」中添加。
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200" />
+
+          {/* Callback URL 预览 */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">回调地址预览</label>
+            <p className="text-xs text-slate-500">
+              在第三方 OAuth 应用控制台中填写的 Callback URL。
+            </p>
+            <div className="space-y-2">
+              {settings?.callback_urls ? (
+                Object.entries(settings.callback_urls).map(([provider, url]) => (
+                  <div
+                    key={provider}
+                    className="p-2 bg-slate-50 rounded border border-slate-100"
+                  >
+                    <div className="text-xs font-medium text-slate-600 mb-1">
+                      {provider.toUpperCase()}
+                    </div>
+                    <code className="text-xs text-slate-700 break-all font-mono">
+                      {url}
+                    </code>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-slate-500">暂无回调地址信息</div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 关闭密码登录确认弹窗 */}
+      <ConfirmDialog
+        open={confirmDisablePassword}
+        onOpenChange={setConfirmDisablePassword}
+        title="关闭密码登录？"
+        description="关闭后所有用户（包括您）将无法使用密码登录。请确保至少有一个 OAuth Provider 已启用，且您本人已绑定 OAuth 账号，否则可能导致无法登录。"
+        variant="destructive"
+        onConfirm={() => {
+          setConfirmDisablePassword(false);
+          savePasswordLogin(false);
+        }}
+      />
+    </>
   );
 }

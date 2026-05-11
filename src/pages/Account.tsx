@@ -11,7 +11,7 @@ import { getOAuthIdentities, unlinkOAuthIdentity, getAuthCapabilities, startOAut
 import type { OAuthIdentity, AuthCapabilities } from '@/types';
 
 const OAUTH_LINK_ERROR_MESSAGES: Record<string, string> = {
-  already_bound: 'OAuth 账号已绑定其他用户。',
+  already_bound: '该 OAuth 账号已绑定到其他用户。',
   disabled: '账号已被禁用。',
   invalid_state: '绑定状态已过期，请重试。',
   missing_code: 'Provider 回调未返回授权码，请重试。',

@@ -10,10 +10,9 @@ import { getAuthCapabilities } from '@/api/auth';
 import type { AuthCapabilities } from '@/types';
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
-  not_linked: '账号未被邀请或未绑定，请联系管理员。',
+  not_linked: '请先使用本地账号登录，然后在账号设置中绑定此 OAuth 账号。',
   disabled: '账号已被禁用。',
   invalid_state: '登录状态已过期，请重试。',
-  already_bound: 'OAuth 账号已绑定其他用户。',
   missing_code: 'Provider 回调未返回授权码，请重试。',
   internal: '登录失败，请稍后重试。',
 };
@@ -146,11 +145,14 @@ export default function Login() {
     } catch (error) {
       const message = error instanceof Error ? error.message : '请检查用户名和密码';
       const isDisabled = message.toLowerCase().includes('account disabled');
+      const isPasswordDisabled = message.toLowerCase().includes('password_login_disabled');
       toast({
-        title: isDisabled ? '账户已禁用' : '登录失败',
+        title: isDisabled ? '账户已禁用' : isPasswordDisabled ? '密码登录已禁用' : '登录失败',
         description: isDisabled
           ? '账户已被禁用，请联系管理员。'
-          : message,
+          : isPasswordDisabled
+            ? '密码登录已被管理员禁用，请使用 OAuth 登录。'
+            : message,
         variant: 'destructive',
       });
     } finally {
