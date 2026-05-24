@@ -7,8 +7,6 @@ import type {
   UpdateStatusRequest,
   ResetPasswordResponse,
   UserOAuthIdentitiesResponse,
-  CreateOAuthInviteRequest,
-  OAuthInvite,
 } from '@/types';
 
 // 获取用户列表（分页）
@@ -53,17 +51,12 @@ export const getUserOAuthIdentities = (id: number): Promise<UserOAuthIdentitiesR
   return get<UserOAuthIdentitiesResponse>(`/api/v1/admin/users/${id}/oauth-identities`);
 };
 
-// 创建 OAuth 邀请
-export const createOAuthInvite = (id: number, data: CreateOAuthInviteRequest): Promise<OAuthInvite> => {
-  return post<OAuthInvite>(`/api/v1/admin/users/${id}/oauth-invites`, data);
-};
-
-// 删除 OAuth 邀请
-export const deleteOAuthInvite = (id: number, inviteId: number): Promise<{ message: string }> => {
-  return del<{ message: string }>(`/api/v1/admin/users/${id}/oauth-invites/${inviteId}`);
-};
-
 // 管理员重置用户 2FA
 export const resetUser2FA = (id: number): Promise<{ message: string }> => {
   return post<{ message: string }>(`/api/v1/admin/users/${id}/2fa/reset`);
+};
+
+// 管理员解绑用户 OAuth 身份
+export const unlinkUserOAuthIdentity = (id: number, provider: string): Promise<{ message: string }> => {
+  return del<{ message: string }>(`/api/v1/admin/users/${id}/oauth-identities/${provider}`);
 };

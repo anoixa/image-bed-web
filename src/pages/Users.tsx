@@ -14,6 +14,7 @@ import {
   Link2,
   User,
   LockOpen,
+  Unlink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,11 +37,10 @@ import {
   resetUserPassword,
   deleteUser,
   getUserOAuthIdentities,
-  createOAuthInvite,
-  deleteOAuthInvite,
   resetUser2FA,
+  unlinkUserOAuthIdentity,
 } from '@/api/admin';
-import type { UserListItem, UserRole, UserStatus, OAuthIdentity, OAuthInvite } from '@/types';
+import type { UserListItem, UserRole, UserStatus, OAuthIdentity } from '@/types';
 
 const PAGE_SIZE = 20;
 
@@ -692,10 +692,8 @@ interface OAuthManageDialogProps {
 
 function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps) {
   const [identities, setIdentities] = useState<OAuthIdentity[]>([]);
-  const [invites, setInvites] = useState<OAuthInvite[]>([]);
   const [loading, setLoading] = useState(false);
-  const [createInviteOpen, setCreateInviteOpen] = useState(false);
-  const [deleteInviteId, setDeleteInviteId] = useState<number | null>(null);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -703,7 +701,6 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
     try {
       const res = await getUserOAuthIdentities(user.ID);
       setIdentities(res.identities || []);
-      setInvites(res.invites || []);
     } catch (error) {
       toast({
         title: '加载失败',
@@ -721,20 +718,25 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
     }
   }, [open, user, loadData]);
 
-  const handleDeleteInvite = async () => {
-    if (!user || !deleteInviteId) return;
+  const handleUnlink = async (identity: OAuthIdentity) => {
+    if (!user) return;
+    setUnlinkingProvider(identity.provider);
     try {
-      await deleteOAuthInvite(user.ID, deleteInviteId);
-      toast({ title: '邀请已删除' });
-      setInvites((prev) => prev.filter((i) => i.id !== deleteInviteId));
+      await unlinkUserOAuthIdentity(user.ID, identity.provider);
+      toast({ title: '解绑成功', description: `已解绑 ${getProviderLabel(identity.provider)} 账号` });
+      setIdentities((prev) => prev.filter((i) => i.id !== identity.id));
     } catch (error) {
+      const message = error instanceof Error ? error.message : '解绑失败';
+      const isConflict = message.includes('409') || message.includes('last login method');
       toast({
-        title: '删除失败',
-        description: error instanceof Error ? error.message : '删除邀请失败',
+        title: isConflict ? '无法解绑' : '解绑失败',
+        description: isConflict
+          ? '不能解绑最后一个可用登录方式，请先确保用户有其他登录方式。'
+          : message,
         variant: 'destructive',
       });
     } finally {
-      setDeleteInviteId(null);
+      setUnlinkingProvider(null);
     }
   };
 
@@ -794,75 +796,19 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 邀请列表 */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  OAuth 邀请 ({invites.length})
-                </h3>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setCreateInviteOpen(true)}
-                  className="gap-1"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  创建邀请
-                </Button>
-              </div>
-
-              {invites.length === 0 ? (
-                <p className="text-sm text-slate-400 py-2">暂无邀请</p>
-              ) : (
-                <div className="space-y-2">
-                  {invites.map((invite) => (
-                    <div
-                      key={invite.id}
-                      className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {getProviderLabel(invite.provider)}
-                          </Badge>
-                          {invite.used_at ? (
-                            <Badge variant="secondary" className="text-xs bg-green-50 text-green-700 border-green-200">
-                              已使用
-                            </Badge>
-                          ) : new Date(invite.expires_at) < new Date() ? (
-                            <Badge variant="secondary" className="text-xs bg-red-50 text-red-700 border-red-200">
-                              已过期
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                              待使用
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {invite.subject && <span className="mr-2">Subject: {invite.subject}</span>}
-                          {invite.email && <span>Email: {invite.email}</span>}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          过期: {new Date(invite.expires_at).toLocaleString('zh-CN')}
-                        </p>
-                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDeleteInviteId(invite.id)}
-                        className="h-8 px-2 text-slate-500 hover:text-red-600"
-                        disabled={!!invite.used_at}
-                        title={invite.used_at ? '已使用的邀请无法删除' : '删除邀请'}
+                        onClick={() => handleUnlink(identity)}
+                        disabled={unlinkingProvider === identity.provider}
+                        className="text-slate-500 hover:text-red-600"
+                        title="解绑"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {unlinkingProvider === identity.provider ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Unlink className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                   ))}
@@ -871,166 +817,6 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
             </div>
           </div>
         )}
-
-        {/* Create Invite Dialog */}
-        <CreateOAuthInviteDialog
-          open={createInviteOpen}
-          onOpenChange={setCreateInviteOpen}
-          userId={user?.ID ?? 0}
-          onSuccess={(invite) => {
-            setInvites((prev) => [...prev, invite]);
-            toast({ title: '邀请创建成功' });
-          }}
-        />
-
-        {/* Delete Invite Confirm */}
-        <ConfirmDialog
-          open={!!deleteInviteId}
-          onOpenChange={(open) => !open && setDeleteInviteId(null)}
-          title="删除邀请"
-          description="确定要删除这个 OAuth 邀请吗？"
-          onConfirm={handleDeleteInvite}
-          confirmText="删除"
-          variant="destructive"
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ==================== Create OAuth Invite Dialog ====================
-
-interface CreateOAuthInviteDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  userId: number;
-  onSuccess: (invite: OAuthInvite) => void;
-}
-
-function CreateOAuthInviteDialog({ open, onOpenChange, userId, onSuccess }: CreateOAuthInviteDialogProps) {
-  const [provider, setProvider] = useState('github');
-  const [subject, setSubject] = useState('');
-  const [email, setEmail] = useState('');
-  const [expiresAt, setExpiresAt] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const resetForm = () => {
-    setProvider('github');
-    setSubject('');
-    setEmail('');
-    setExpiresAt('');
-  };
-
-  const handleSubmit = async () => {
-    if (!subject.trim() && !email.trim()) {
-      toast({ title: '请至少填写 Subject 或 Email', variant: 'destructive' });
-      return;
-    }
-    if (!expiresAt) {
-      toast({ title: '请选择过期时间', variant: 'destructive' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const res = await createOAuthInvite(userId, {
-        provider,
-        subject: subject.trim(),
-        email: email.trim(),
-        expires_at: new Date(expiresAt).toISOString(),
-      });
-      onSuccess(res);
-      onOpenChange(false);
-      resetForm();
-    } catch (error) {
-      toast({
-        title: '创建失败',
-        description: error instanceof Error ? error.message : '创建邀请失败',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // 默认过期时间：30 天后
-  useEffect(() => {
-    if (open && !expiresAt) {
-      const d = new Date();
-      d.setDate(d.getDate() + 30);
-      setExpiresAt(d.toISOString().slice(0, 16));
-    }
-  }, [open, expiresAt]);
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) resetForm(); onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-indigo-600" />
-            创建 OAuth 邀请
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Provider</label>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-2 bg-white hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            >
-              <option value="github">GitHub</option>
-              <option value="google">Google</option>
-              <option value="gitee">Gitee</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Subject</label>
-            <Input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="外部账号 ID（优先）"
-            />
-            <p className="text-xs text-slate-400">Provider 返回的唯一用户标识。Gitee 建议优先使用此字段。</p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="邮箱地址"
-            />
-            <p className="text-xs text-slate-400">仅在 Provider 返回 email_verified=true 时生效。</p>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">过期时间</label>
-            <Input
-              type="datetime-local"
-              value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
-            />
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="outline" onClick={() => { onOpenChange(false); resetForm(); }}>
-              取消
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  创建中...
-                </>
-              ) : (
-                '创建'
-              )}
-            </Button>
-          </div>
-        </div>
       </DialogContent>
     </Dialog>
   );

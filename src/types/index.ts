@@ -525,31 +525,9 @@ export interface OAuthIdentity {
   created_at?: string;
 }
 
-// OAuth 邀请
-export interface OAuthInvite {
-  id: number;
-  user_id: number;
-  provider: string;
-  subject: string;
-  email: string;
-  created_by: number;
-  expires_at: string;
-  used_at: string | null;
-  created_at?: string;
-}
-
-// 用户 OAuth 身份和邀请响应
+// 用户 OAuth 身份响应
 export interface UserOAuthIdentitiesResponse {
   identities: OAuthIdentity[];
-  invites: OAuthInvite[];
-}
-
-// 创建 OAuth 邀请请求
-export interface CreateOAuthInviteRequest {
-  provider: string;
-  subject: string;
-  email: string;
-  expires_at: string;
 }
 
 // OAuth 配置（用于管理员配置 providers）
