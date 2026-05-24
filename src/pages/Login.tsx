@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ImageIcon, Loader2 } from 'lucide-react';
+import { ImageIcon, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/auth';
@@ -55,12 +55,17 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const login = useAuthStore((state) => state.login);
+  const verify2FA = useAuthStore((state) => state.verify2FA);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
+
+  // 2FA 状态
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFACode, setTwoFACode] = useState('');
 
   // 加载登录能力
   useEffect(() => {
@@ -136,12 +141,20 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      await login(username, password);
-      toast({
-        title: '登录成功',
-        description: '欢迎回来！',
-      });
-      setTimeout(() => navigate('/'), 300);
+      const result = await login(username, password);
+      if (result.requires2FA) {
+        setRequires2FA(true);
+        toast({
+          title: '需要二次验证',
+          description: '请输入您的 6 位验证码',
+        });
+      } else {
+        toast({
+          title: '登录成功',
+          description: '欢迎回来！',
+        });
+        setTimeout(() => navigate('/'), 300);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : '请检查用户名和密码';
       const isDisabled = message.toLowerCase().includes('account disabled');
@@ -158,6 +171,43 @@ export default function Login() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (twoFACode.length !== 6) {
+      toast({
+        title: '请输入 6 位验证码',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await verify2FA(twoFACode);
+      toast({
+        title: '登录成功',
+        description: '欢迎回来！',
+      });
+      setTimeout(() => navigate('/'), 300);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '验证失败';
+      toast({
+        title: '验证失败',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackToLogin = () => {
+    setRequires2FA(false);
+    setTwoFACode('');
+    setPassword('');
   };
 
   const handleOAuthLogin = (provider: string) => {
@@ -180,14 +230,22 @@ export default function Login() {
             {/* Logo */}
             <div className="flex justify-center mb-8">
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-600/20">
-                <ImageIcon className="w-8 h-8 text-white" />
+                {requires2FA ? (
+                  <Shield className="w-8 h-8 text-white" />
+                ) : (
+                  <ImageIcon className="w-8 h-8 text-white" />
+                )}
               </div>
             </div>
 
             {/* Title */}
             <div className="text-center mb-10">
-              <h1 className="text-2xl font-bold text-slate-900 mb-2">欢迎回来</h1>
-              <p className="text-slate-400 text-sm">管理您的极速云端图床</p>
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                {requires2FA ? '两步验证' : '欢迎回来'}
+              </h1>
+              <p className="text-slate-400 text-sm">
+                {requires2FA ? '请输入您的 6 位验证码' : '管理您的极速云端图床'}
+              </p>
             </div>
 
             {capabilitiesLoading ? (
@@ -196,58 +254,19 @@ export default function Login() {
               </div>
             ) : (
               <div className="space-y-5">
-                {/* OAuth 登录按钮 */}
-                {showOAuth && (
-                  <div className="space-y-3">
-                    {capabilities!.providers.map((p) => (
-                      <Button
-                        key={p.provider}
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleOAuthLogin(p.provider)}
-                        className="w-full h-12 rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-all"
-                      >
-                        <span className="mr-3">{getProviderIcon(p.provider)}</span>
-                        使用 {p.display_name} 登录
-                      </Button>
-                    ))}
-
-                    {/* 分隔线 */}
-                    {showPasswordForm && (
-                      <div className="relative my-4">
-                        <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-slate-200" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white/95 px-2 text-slate-400">或</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* 密码登录表单 */}
-                {showPasswordForm && (
-                  <form onSubmit={handleSubmit} className="space-y-5">
+                {requires2FA ? (
+                  /* 2FA 验证表单 */
+                  <form onSubmit={handle2FASubmit} className="space-y-5">
                     <div>
                       <Input
                         type="text"
-                        placeholder="用户名"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
+                        inputMode="numeric"
+                        placeholder="6 位验证码"
+                        value={twoFACode}
+                        onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         disabled={isLoading}
-                        className="h-14 px-5 rounded-xl border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
-                      />
-                    </div>
-
-                    <div>
-                      <Input
-                        type="password"
-                        placeholder="密码"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        disabled={isLoading}
-                        className="h-14 px-5 rounded-xl border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
+                        autoFocus
+                        className="h-14 px-5 rounded-xl border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50 text-center text-lg tracking-widest"
                       />
                     </div>
 
@@ -259,13 +278,97 @@ export default function Login() {
                       {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          登录中...
+                          验证中...
                         </>
                       ) : (
-                        '进入控制台'
+                        '验证并登录'
                       )}
                     </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleBackToLogin}
+                      disabled={isLoading}
+                      className="w-full text-slate-500 hover:text-slate-700"
+                    >
+                      返回登录
+                    </Button>
                   </form>
+                ) : (
+                  <>
+                    {/* OAuth 登录按钮 */}
+                    {showOAuth && (
+                      <div className="space-y-3">
+                        {capabilities!.providers.map((p) => (
+                          <Button
+                            key={p.provider}
+                            type="button"
+                            variant="outline"
+                            onClick={() => handleOAuthLogin(p.provider)}
+                            className="w-full h-12 rounded-xl border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-all"
+                          >
+                            <span className="mr-3">{getProviderIcon(p.provider)}</span>
+                            使用 {p.display_name} 登录
+                          </Button>
+                        ))}
+
+                        {/* 分隔线 */}
+                        {showPasswordForm && (
+                          <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                              <div className="w-full border-t border-slate-200" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-white/95 px-2 text-slate-400">或</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 密码登录表单 */}
+                    {showPasswordForm && (
+                      <form onSubmit={handleSubmit} className="space-y-5">
+                        <div>
+                          <Input
+                            type="text"
+                            placeholder="用户名"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            disabled={isLoading}
+                            className="h-14 px-5 rounded-xl border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
+                          />
+                        </div>
+
+                        <div>
+                          <Input
+                            type="password"
+                            placeholder="密码"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            disabled={isLoading}
+                            className="h-14 px-5 rounded-xl border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all disabled:opacity-50"
+                          />
+                        </div>
+
+                        <Button
+                          type="submit"
+                          className="w-full h-14 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-base shadow-lg shadow-indigo-600/25 transition-all hover:shadow-xl hover:shadow-indigo-600/30 disabled:opacity-70"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              登录中...
+                            </>
+                          ) : (
+                            '进入控制台'
+                          )}
+                        </Button>
+                      </form>
+                    )}
+                  </>
                 )}
               </div>
             )}

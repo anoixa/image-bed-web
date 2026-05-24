@@ -62,3 +62,8 @@ export const createOAuthInvite = (id: number, data: CreateOAuthInviteRequest): P
 export const deleteOAuthInvite = (id: number, inviteId: number): Promise<{ message: string }> => {
   return del<{ message: string }>(`/api/v1/admin/users/${id}/oauth-invites/${inviteId}`);
 };
+
+// 管理员重置用户 2FA
+export const resetUser2FA = (id: number): Promise<{ message: string }> => {
+  return post<{ message: string }>(`/api/v1/admin/users/${id}/2fa/reset`);
+};

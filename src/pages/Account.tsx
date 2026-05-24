@@ -1,14 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { User, Link2, Unlink, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import {
+  User, Link2, Unlink, Loader2, ExternalLink, AlertCircle,
+  Shield, ShieldCheck, ShieldOff, Copy, Check, KeyRound,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/use-toast';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useAuthStore } from '@/store/auth';
-import { getOAuthIdentities, unlinkOAuthIdentity, getAuthCapabilities, startOAuthLink } from '@/api/auth';
+import {
+  getOAuthIdentities, unlinkOAuthIdentity, getAuthCapabilities, startOAuthLink,
+  get2FAStatus, setup2FA, enable2FA, disable2FA,
+} from '@/api/auth';
 import type { OAuthIdentity, AuthCapabilities } from '@/types';
+import QRCode from 'qrcode';
 
 const OAUTH_LINK_ERROR_MESSAGES: Record<string, string> = {
   already_bound: '该 OAuth 账号已绑定到其他用户。',
@@ -36,6 +44,19 @@ export default function Account() {
   const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
   const [confirmUnlink, setConfirmUnlink] = useState<OAuthIdentity | null>(null);
 
+  // 2FA 状态
+  const [twoFAEnabled, setTwoFAEnabled] = useState<boolean | null>(null);
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [setupStep, setSetupStep] = useState<'password' | 'qr' | 'confirm'>('password');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupQRDataURL, setSetupQRDataURL] = useState('');
+  const [setupSecret, setSetupSecret] = useState('');
+  const [setupCode, setSetupCode] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+  const [copiedSecret, setCopiedSecret] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -56,9 +77,19 @@ export default function Account() {
     }
   }, []);
 
+  const load2FAStatus = useCallback(async () => {
+    try {
+      const status = await get2FAStatus();
+      setTwoFAEnabled(status.enabled);
+    } catch {
+      setTwoFAEnabled(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    load2FAStatus();
+  }, [loadData, load2FAStatus]);
 
   // 处理 OAuth 绑定成功提示
   useEffect(() => {
@@ -145,6 +176,93 @@ export default function Account() {
     (p) => p.enabled && !identities.some((i) => i.provider === p.provider)
   ) ?? [];
 
+  // ==================== 2FA Handlers ====================
+
+  const handleStartSetup = async () => {
+    if (!setupPassword.trim()) {
+      toast({ title: '请输入当前密码', variant: 'destructive' });
+      return;
+    }
+    setTwoFALoading(true);
+    try {
+      const res = await setup2FA({ current_password: setupPassword.trim() });
+      setSetupSecret(res.secret);
+      // 生成二维码
+      const dataURL = await QRCode.toDataURL(res.uri, { width: 200, margin: 2 });
+      setSetupQRDataURL(dataURL);
+      setSetupStep('qr');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '设置失败';
+      toast({ title: '设置失败', description: message, variant: 'destructive' });
+    } finally {
+      setTwoFALoading(false);
+    }
+  };
+
+  const handleEnable2FA = async () => {
+    if (setupCode.length !== 6) {
+      toast({ title: '请输入 6 位验证码', variant: 'destructive' });
+      return;
+    }
+    setTwoFALoading(true);
+    try {
+      await enable2FA({ code: setupCode });
+      toast({ title: '2FA 已启用', description: '两步验证已成功开启' });
+      setTwoFAEnabled(true);
+      setShowSetupDialog(false);
+      resetSetupState();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '启用失败';
+      toast({ title: '启用失败', description: message, variant: 'destructive' });
+    } finally {
+      setTwoFALoading(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (disableCode.length !== 6) {
+      toast({ title: '请输入 6 位验证码', variant: 'destructive' });
+      return;
+    }
+    setTwoFALoading(true);
+    try {
+      await disable2FA({ code: disableCode });
+      toast({ title: '2FA 已关闭', description: '两步验证已成功关闭' });
+      setTwoFAEnabled(false);
+      setShowDisableDialog(false);
+      setDisableCode('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '关闭失败';
+      toast({ title: '关闭失败', description: message, variant: 'destructive' });
+    } finally {
+      setTwoFALoading(false);
+    }
+  };
+
+  const resetSetupState = () => {
+    setSetupStep('password');
+    setSetupPassword('');
+    setSetupQRDataURL('');
+    setSetupSecret('');
+    setSetupCode('');
+    setCopiedSecret(false);
+  };
+
+  const handleCopySecret = async () => {
+    try {
+      await navigator.clipboard.writeText(setupSecret);
+      setCopiedSecret(true);
+      setTimeout(() => setCopiedSecret(false), 2000);
+    } catch {
+      toast({ title: '复制失败', variant: 'destructive' });
+    }
+  };
+
+  const handleOpenSetup = () => {
+    resetSetupState();
+    setShowSetupDialog(true);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -152,7 +270,7 @@ export default function Account() {
           <User className="w-6 h-6 text-indigo-600" />
           账号设置
         </h1>
-        <p className="text-slate-500 mt-1">管理您的账号信息和 OAuth 绑定</p>
+        <p className="text-slate-500 mt-1">管理您的账号信息和安全设置</p>
       </div>
 
       {/* 用户信息卡片 */}
@@ -197,6 +315,53 @@ export default function Account() {
             <div>
               <p className="text-slate-500">用户 ID</p>
               <p className="font-medium text-slate-900">{user?.id ?? '-'}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 两步验证 (2FA) 卡片 */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="h-5 w-5" />
+            两步验证 (2FA)
+          </CardTitle>
+          {twoFAEnabled !== null && (
+            twoFAEnabled ? (
+              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 gap-1">
+                <ShieldCheck className="h-3 w-3" />
+                已开启
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="gap-1">
+                <ShieldOff className="h-3 w-3" />
+                未开启
+              </Badge>
+            )
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <p className="text-sm text-slate-600">
+                {twoFAEnabled
+                  ? '您的账号已启用两步验证，登录时需要输入验证码。'
+                  : '开启两步验证后，登录时除了密码还需要输入验证码，提高账号安全性。'}
+              </p>
+            </div>
+            <div className="ml-4 shrink-0">
+              {twoFAEnabled === null ? (
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+              ) : twoFAEnabled ? (
+                <Button variant="outline" size="sm" onClick={() => setShowDisableDialog(true)}>
+                  关闭 2FA
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleOpenSetup} className="bg-indigo-600 hover:bg-indigo-700">
+                  开启 2FA
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
@@ -319,6 +484,206 @@ export default function Account() {
         confirmText="解绑"
         variant="destructive"
       />
+
+      {/* ==================== 2FA 设置弹窗 ==================== */}
+      {showSetupDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">开启两步验证</h2>
+                  <p className="text-sm text-slate-500">
+                    {setupStep === 'password' && '验证当前密码'}
+                    {setupStep === 'qr' && '扫描 QR 码'}
+                    {setupStep === 'confirm' && '输入验证码确认'}
+                  </p>
+                </div>
+              </div>
+
+              {/* 步骤 1：输入密码 */}
+              {setupStep === 'password' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
+                    为了安全起见，请输入您的当前密码以继续开启两步验证。
+                  </p>
+                  <Input
+                    type="password"
+                    placeholder="当前密码"
+                    value={setupPassword}
+                    onChange={(e) => setSetupPassword(e.target.value)}
+                    disabled={twoFALoading}
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setShowSetupDialog(false)} disabled={twoFALoading}>
+                      取消
+                    </Button>
+                    <Button
+                      onClick={handleStartSetup}
+                      disabled={twoFALoading}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      {twoFALoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          处理中...
+                        </>
+                      ) : (
+                        '下一步'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 步骤 2：展示 QR 码 */}
+              {setupStep === 'qr' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
+                    请使用 Google Authenticator、Microsoft Authenticator 等验证器扫描下方二维码。
+                  </p>
+                  {setupQRDataURL && (
+                    <div className="flex justify-center">
+                      <img src={setupQRDataURL} alt="2FA QR Code" className="w-48 h-48" />
+                    </div>
+                  )}
+                  <div className="bg-slate-50 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-slate-500">无法扫描？请手动输入密钥：</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-sm font-mono bg-white border border-slate-200 rounded px-2 py-1 break-all">
+                        {setupSecret}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCopySecret}
+                        className="shrink-0"
+                      >
+                        {copiedSecret ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setSetupStep('password')} disabled={twoFALoading}>
+                      上一步
+                    </Button>
+                    <Button
+                      onClick={() => setSetupStep('confirm')}
+                      disabled={twoFALoading}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      已扫描，下一步
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 步骤 3：确认验证码 */}
+              {setupStep === 'confirm' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-600">
+                    请输入验证器上显示的 6 位验证码以确认设置。
+                  </p>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="6 位验证码"
+                    value={setupCode}
+                    onChange={(e) => setSetupCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    disabled={twoFALoading}
+                    autoFocus
+                    className="text-center text-lg tracking-widest"
+                  />
+                  <div className="flex justify-end gap-3">
+                    <Button variant="outline" onClick={() => setSetupStep('qr')} disabled={twoFALoading}>
+                      上一步
+                    </Button>
+                    <Button
+                      onClick={handleEnable2FA}
+                      disabled={twoFALoading || setupCode.length !== 6}
+                      className="bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      {twoFALoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          启用中...
+                        </>
+                      ) : (
+                        '启用 2FA'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 2FA 关闭弹窗 ==================== */}
+      {showDisableDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="p-6 space-y-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                  <ShieldOff className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">关闭两步验证</h2>
+                  <p className="text-sm text-slate-500">此操作会降低账号安全性</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                <p className="text-sm text-amber-800">
+                  <strong>警告：</strong> 关闭两步验证后，您的账号将仅通过密码保护。建议保持开启以提高安全性。
+                </p>
+              </div>
+
+              <p className="text-sm text-slate-600">请输入当前 6 位验证码以确认关闭。</p>
+              <Input
+                type="text"
+                inputMode="numeric"
+                placeholder="6 位验证码"
+                value={disableCode}
+                onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                disabled={twoFALoading}
+                autoFocus
+                className="text-center text-lg tracking-widest"
+              />
+
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setShowDisableDialog(false)} disabled={twoFALoading}>
+                  取消
+                </Button>
+                <Button
+                  onClick={handleDisable2FA}
+                  disabled={twoFALoading || disableCode.length !== 6}
+                  variant="destructive"
+                >
+                  {twoFALoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      处理中...
+                    </>
+                  ) : (
+                    '确认关闭'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

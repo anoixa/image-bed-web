@@ -109,11 +109,18 @@ export interface CreateTokenResponse {
 }
 
 // 登录响应 - 匹配后端Swagger定义 (api.loginResponse)
-export interface LoginResponse {
+export interface LoginSuccessResponse {
   access_token: string;
   access_token_expiry: number;
-  user?: User;
 }
+
+export interface TwoFARequiredResponse {
+  requires_2fa: true;
+  ticket: string;
+  expires_in: number;
+}
+
+export type LoginResponse = LoginSuccessResponse | TwoFARequiredResponse;
 
 // 用户角色与状态
 export type UserRole = 'admin' | 'user';
@@ -129,7 +136,7 @@ export interface User {
 
 // 用户列表项
 export interface UserListItem {
-  id: number;
+  ID: number;
   username: string;
   role: UserRole;
   status: UserStatus;
@@ -562,4 +569,35 @@ export interface OAuthProviderConfig {
   created_at: string;
   updated_at: string;
   description?: string;
+}
+
+// ==================== 2FA 类型 ====================
+
+// 2FA 状态
+export interface TwoFAStatus {
+  enabled: boolean;
+}
+
+// 2FA 设置响应
+export interface TwoFASetupResponse {
+  enabled: boolean;
+  uri: string;
+  secret: string;
+}
+
+// 2FA 验证请求
+export interface TwoFAVerifyRequest {
+  ticket: string;
+  code: string;
+}
+
+// 2FA 启用/禁用请求
+export interface TwoFAToggleRequest {
+  code: string;
+}
+
+// 2FA 设置请求（带密码或验证码校验）
+export interface TwoFASetupRequest {
+  current_password?: string;
+  current_code?: string;
 }

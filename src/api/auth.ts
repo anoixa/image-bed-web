@@ -1,5 +1,17 @@
 import { get, post, put, del } from '@/lib/request';
-import type { LoginResponse, User, AuthCapabilities, OAuthProvider, OAuthIdentity } from '@/types';
+import type {
+  LoginResponse,
+  LoginSuccessResponse,
+  User,
+  AuthCapabilities,
+  OAuthProvider,
+  OAuthIdentity,
+  TwoFAStatus,
+  TwoFASetupResponse,
+  TwoFASetupRequest,
+  TwoFAToggleRequest,
+  TwoFAVerifyRequest,
+} from '@/types';
 
 // 登录
 export const login = (username: string, password: string): Promise<LoginResponse> => {
@@ -12,8 +24,8 @@ export const getCurrentUser = (): Promise<User> => {
 };
 
 // 刷新 Token - 使用 HttpOnly Cookie 中的 refresh_token
-export const refreshToken = (): Promise<LoginResponse> => {
-  return post<LoginResponse>('/api/auth/refresh');
+export const refreshToken = (): Promise<LoginSuccessResponse> => {
+  return post<LoginSuccessResponse>('/api/auth/refresh');
 };
 
 // 登出
@@ -24,6 +36,33 @@ export const logout = (): Promise<void> => {
 // 修改密码
 export const changePassword = (oldPassword: string, newPassword: string): Promise<void> => {
   return post('/api/v1/user/password', { old_password: oldPassword, new_password: newPassword });
+};
+
+// ==================== 2FA ====================
+
+// 提交两步验证码登录
+export const verify2FA = (data: TwoFAVerifyRequest): Promise<LoginSuccessResponse> => {
+  return post<LoginSuccessResponse>('/api/auth/login/2fa', data);
+};
+
+// 获取当前用户 2FA 状态
+export const get2FAStatus = (): Promise<TwoFAStatus> => {
+  return get<TwoFAStatus>('/api/v1/user/2fa');
+};
+
+// 初始化 2FA 设置
+export const setup2FA = (data: TwoFASetupRequest): Promise<TwoFASetupResponse> => {
+  return post<TwoFASetupResponse>('/api/v1/user/2fa/setup', data);
+};
+
+// 启用 2FA
+export const enable2FA = (data: TwoFAToggleRequest): Promise<void> => {
+  return post('/api/v1/user/2fa/enable', data);
+};
+
+// 关闭 2FA
+export const disable2FA = (data: TwoFAToggleRequest): Promise<void> => {
+  return post('/api/v1/user/2fa/disable', data);
 };
 
 // ==================== OAuth ====================

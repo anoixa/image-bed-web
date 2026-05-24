@@ -13,6 +13,7 @@ import {
   UserCog,
   Link2,
   User,
+  LockOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import {
   getUserOAuthIdentities,
   createOAuthInvite,
   deleteOAuthInvite,
+  resetUser2FA,
 } from '@/api/admin';
 import type { UserListItem, UserRole, UserStatus, OAuthIdentity, OAuthInvite } from '@/types';
 
@@ -71,6 +73,9 @@ export default function Users() {
   const [oauthManageOpen, setOauthManageOpen] = useState(false);
   const [oauthManageUser, setOauthManageUser] = useState<UserListItem | null>(null);
 
+  // 2FA 重置确认弹窗
+  const [reset2FAConfirmOpen, setReset2FAConfirmOpen] = useState(false);
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -96,7 +101,7 @@ export default function Users() {
 
   const handleRoleChange = async (user: UserListItem, role: UserRole) => {
     try {
-      await updateUserRole(user.id, { role });
+      await updateUserRole(user.ID, { role });
       toast({ title: '角色更新成功' });
       loadUsers();
     } catch (error) {
@@ -110,7 +115,7 @@ export default function Users() {
 
   const handleStatusChange = async (user: UserListItem, status: UserStatus) => {
     try {
-      await updateUserStatus(user.id, { status });
+      await updateUserStatus(user.ID, { status });
       toast({ title: status === 'active' ? '用户已启用' : '用户已禁用' });
       loadUsers();
     } catch (error) {
@@ -130,7 +135,7 @@ export default function Users() {
   const handleResetPassword = async () => {
     if (!targetUser) return;
     try {
-      const res = await resetUserPassword(targetUser.id);
+      const res = await resetUserPassword(targetUser.ID);
       setPasswordResult(res.password);
       setPasswordResultTitle(`已重置 ${targetUser.username} 的密码`);
       setPasswordResultOpen(true);
@@ -155,7 +160,7 @@ export default function Users() {
   const handleDelete = async () => {
     if (!targetUser) return;
     try {
-      await deleteUser(targetUser.id);
+      await deleteUser(targetUser.ID);
       toast({ title: '用户已删除' });
       loadUsers();
     } catch (error) {
@@ -177,6 +182,30 @@ export default function Users() {
   const openOAuthManage = (user: UserListItem) => {
     setOauthManageUser(user);
     setOauthManageOpen(true);
+  };
+
+  const openReset2FAConfirm = (user: UserListItem) => {
+    setTargetUser(user);
+    setReset2FAConfirmOpen(true);
+  };
+
+  const handleReset2FA = async () => {
+    if (!targetUser) return;
+    try {
+      await resetUser2FA(targetUser.ID);
+      toast({ title: '2FA 已重置', description: `用户 "${targetUser.username}" 的两步验证已重置` });
+      loadUsers();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '重置 2FA 失败';
+      toast({
+        title: '重置失败',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setReset2FAConfirmOpen(false);
+      setTargetUser(null);
+    }
   };
 
   return (
@@ -244,13 +273,13 @@ export default function Users() {
                 </tr>
               ) : (
                 users.map((user) => {
-                  const isSelf = user.id === currentUser?.id;
+                  const isSelf = user.ID === currentUser?.id;
                   return (
                     <tr
-                      key={user.id}
+                      key={user.ID}
                       className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors"
                     >
-                      <td className="px-4 py-3 text-slate-500">{user.id}</td>
+                      <td className="px-4 py-3 text-slate-500">{user.ID}</td>
                       <td className="px-4 py-3 font-medium text-slate-800">
                         <div className="flex items-center gap-2">
                           {user.username}
@@ -315,6 +344,15 @@ export default function Users() {
                             title="重置密码"
                           >
                             <KeyRound className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openReset2FAConfirm(user)}
+                            className="h-8 px-2 text-slate-600 hover:text-amber-600"
+                            title="重置 2FA"
+                          >
+                            <LockOpen className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -408,6 +446,17 @@ export default function Users() {
         description={`确定要删除用户 "${targetUser?.username}" 吗？此操作不可撤销。如果该用户仍拥有图片或相册，删除将失败。`}
         onConfirm={handleDelete}
         confirmText="删除"
+        variant="destructive"
+      />
+
+      {/* Reset 2FA Confirm */}
+      <ConfirmDialog
+        open={reset2FAConfirmOpen}
+        onOpenChange={setReset2FAConfirmOpen}
+        title="重置两步验证"
+        description={`确定要重置用户 "${targetUser?.username}" 的两步验证吗？重置后该用户需要重新设置 2FA。`}
+        onConfirm={handleReset2FA}
+        confirmText="重置"
         variant="destructive"
       />
     </div>
@@ -652,7 +701,7 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
     if (!user) return;
     setLoading(true);
     try {
-      const res = await getUserOAuthIdentities(user.id);
+      const res = await getUserOAuthIdentities(user.ID);
       setIdentities(res.identities || []);
       setInvites(res.invites || []);
     } catch (error) {
@@ -675,7 +724,7 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
   const handleDeleteInvite = async () => {
     if (!user || !deleteInviteId) return;
     try {
-      await deleteOAuthInvite(user.id, deleteInviteId);
+      await deleteOAuthInvite(user.ID, deleteInviteId);
       toast({ title: '邀请已删除' });
       setInvites((prev) => prev.filter((i) => i.id !== deleteInviteId));
     } catch (error) {
@@ -827,7 +876,7 @@ function OAuthManageDialog({ open, onOpenChange, user }: OAuthManageDialogProps)
         <CreateOAuthInviteDialog
           open={createInviteOpen}
           onOpenChange={setCreateInviteOpen}
-          userId={user?.id ?? 0}
+          userId={user?.ID ?? 0}
           onSuccess={(invite) => {
             setInvites((prev) => [...prev, invite]);
             toast({ title: '邀请创建成功' });

@@ -6,7 +6,9 @@ import {
   logout as logoutApi,
   refreshToken as refreshTokenApi,
   getCurrentUser,
+  verify2FA as verify2FAAPI,
 } from '@/api/auth';
+import type { LoginSuccessResponse } from '@/types';
 
 interface AuthState {
   user: User | null;
@@ -15,9 +17,11 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   isRefreshing: boolean;
+  twoFATicket: string | null;
 
   // Actions
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<{ requires2FA: boolean }>;
+  verify2FA: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<boolean>;
   checkAndRefreshToken: () => Promise<boolean>;
@@ -38,16 +42,27 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       isRefreshing: false,
+      twoFATicket: null,
 
       login: async (username: string, password: string) => {
-        set({ isLoading: true });
+        set({ isLoading: true, twoFATicket: null });
         try {
           const response = await loginApi(username, password);
 
-          const token = response.access_token.replace('Bearer ', '');
-          const expiry = response.access_token_expiry * 1000; // 转换为毫秒时间戳
+          // 检查是否需要 2FA
+          if ('requires_2fa' in response && response.requires_2fa) {
+            set({
+              twoFATicket: response.ticket,
+              isLoading: false,
+            });
+            return { requires2FA: true };
+          }
 
-          // 通过 /api/auth/me 获取完整用户信息
+          // 正常登录成功
+          const successResponse = response as LoginSuccessResponse;
+          const token = successResponse.access_token.replace('Bearer ', '');
+          const expiry = successResponse.access_token_expiry * 1000;
+
           const user = await getCurrentUser();
 
           set({
@@ -56,6 +71,36 @@ export const useAuthStore = create<AuthState>()(
             accessTokenExpiry: expiry,
             isAuthenticated: true,
             isLoading: false,
+            twoFATicket: null,
+          });
+          return { requires2FA: false };
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      verify2FA: async (code: string) => {
+        set({ isLoading: true });
+        try {
+          const { twoFATicket } = get();
+          if (!twoFATicket) {
+            throw new Error('无效的 2FA 会话');
+          }
+
+          const response = await verify2FAAPI({ ticket: twoFATicket, code });
+          const token = response.access_token.replace('Bearer ', '');
+          const expiry = response.access_token_expiry * 1000;
+
+          const user = await getCurrentUser();
+
+          set({
+            user,
+            accessToken: token,
+            accessTokenExpiry: expiry,
+            isAuthenticated: true,
+            isLoading: false,
+            twoFATicket: null,
           });
         } catch (error) {
           set({ isLoading: false });
@@ -200,6 +245,7 @@ export const useAuthStore = create<AuthState>()(
         accessToken: state.accessToken,
         accessTokenExpiry: state.accessTokenExpiry,
         isAuthenticated: state.isAuthenticated,
+        twoFATicket: state.twoFATicket,
       }),
     }
   )

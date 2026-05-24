@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import type { ApiResponse, LoginResponse } from '@/types';
+import type { ApiResponse, LoginSuccessResponse } from '@/types';
 
 const request: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -21,12 +21,12 @@ const refreshRequest: AxiosInstance = axios.create({
   },
 });
 
-const refreshTokenApi = (): Promise<LoginResponse> => {
-  return refreshRequest.post<ApiResponse<LoginResponse>>('/api/auth/refresh').then((res) => {
+const refreshTokenApi = (): Promise<LoginSuccessResponse> => {
+  return refreshRequest.post<ApiResponse<LoginSuccessResponse>>('/api/auth/refresh').then((res) => {
     if (res.data.status === 'error') {
       throw new Error(res.data.msg || '刷新失败');
     }
-    return res.data.data as LoginResponse;
+    return res.data.data as LoginSuccessResponse;
   });
 };
 
