@@ -423,10 +423,30 @@ export interface RandomImageResponse {
   };
 }
 
-// 随机图源相册配置
+// 调用随机 API 用的三态模式
+export type RandomSourceMode = 'configured' | 'album' | 'all';
+
+// 设置页保存配置用的二态模式
+export type RandomSourceConfigMode = 'album' | 'all';
+
+// 构建随机图 URL 的参数
+export interface RandomImageParams {
+  mode: RandomSourceMode;
+  albumId?: number;
+  format?: 'json' | 'image';
+  minWidth?: number;
+  minHeight?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+  requireWebP?: boolean;
+  maxFileSize?: number;
+}
+
+// 随机图源相册配置（后端响应/请求）
 export interface RandomSourceAlbumConfig {
-  album_id: number | null;
-  include_all_public?: boolean;
+  album_id: number;
+  include_all_public: boolean;
+  enabled: boolean;
 }
 
 // Transfer Mode 类型
