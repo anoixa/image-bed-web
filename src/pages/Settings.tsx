@@ -28,11 +28,8 @@ import {
   enableStorageConfig,
   disableStorageConfig,
 } from '@/api/configs';
-import {
-  fetchRandomSourceAlbum,
-  updateRandomSourceAlbum
-} from '@/api/images';
-import type { StorageConfig, Album, RandomSourceAlbumConfig, SystemStatus, TransferMode, TransferModeConfig, ConversionConfig } from '@/types';
+import type { StorageConfig, Album, SystemStatus, TransferMode, TransferModeConfig, ConversionConfig } from '@/types';
+import RandomSourceConfigCard from '@/components/RandomSourceConfigCard';
 import { toast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -63,10 +60,8 @@ export default function Settings() {
     onConfirm: () => {},
   });
 
-  // 随机图源相册配置
+  // 相册列表（供随机图源配置和上传默认相册使用）
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [randomSourceAlbum, setRandomSourceAlbum] = useState<number | null>(null);
-  const [isUpdatingRandomSource, setIsUpdatingRandomSource] = useState(false);
 
   // Transfer Mode 配置
   const [transferMode, setTransferMode] = useState<TransferMode>('auto');
@@ -96,10 +91,9 @@ export default function Settings() {
     setLoading(true);
     try {
 
-      const [storageResult, albumsResult, randomSourceResult, systemStatusResult, transferModeResult, conversionConfigResult] = await Promise.allSettled([
+      const [storageResult, albumsResult, systemStatusResult, transferModeResult, conversionConfigResult] = await Promise.allSettled([
         fetchStorageConfigs(),
         fetchAlbums(),
-        fetchRandomSourceAlbum(),
         fetchSystemStatus(),
         fetchTransferMode(),
         fetchConversionConfig(),
@@ -128,16 +122,6 @@ export default function Settings() {
       } else {
         console.error('加载相册失败:', albumsResult.reason);
         setAlbums([]);
-      }
-
-      // 处理随机图源相册配置
-      if (randomSourceResult.status === 'fulfilled') {
-        // album_id 为 0 时表示"所有公开图片"，转换为 null
-        const albumId = randomSourceResult.value.album_id;
-        setRandomSourceAlbum(albumId === 0 ? null : albumId);
-      } else {
-        console.error('加载随机图源相册配置失败:', randomSourceResult.reason);
-        setRandomSourceAlbum(null);
       }
 
       // 处理系统状态
@@ -337,27 +321,6 @@ export default function Settings() {
       });
     } finally {
       setIsUpdatingTransferMode(false);
-    }
-  };
-
-  // 随机图源相册管理
-  const handleUpdateRandomSourceAlbum = async (albumId: number | null) => {
-    setIsUpdatingRandomSource(true);
-    try {
-      await updateRandomSourceAlbum(albumId);
-      setRandomSourceAlbum(albumId);
-      toast({
-        title: '更新成功',
-        description: '随机图源已更新',
-      });
-    } catch (error) {
-      toast({
-        title: '更新失败',
-        description: error instanceof Error ? error.message : '请稍后重试',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUpdatingRandomSource(false);
     }
   };
 
@@ -1013,45 +976,7 @@ export default function Settings() {
 
         {/* 登录背景设置 */}
         <TabsContent value="background" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="h-5 w-5" />
-                随机图源相册
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">选择相册</label>
-                <p className="text-xs text-slate-500 mb-2">
-                  登录页面背景将从这个相册中随机选取图片显示
-                </p>
-                <select
-                  value={randomSourceAlbum === null ? '' : randomSourceAlbum}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    handleUpdateRandomSourceAlbum(value === '' ? null : parseInt(value));
-                  }}
-                  disabled={isUpdatingRandomSource}
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                >
-                  <option value="">所有公开图片</option>
-                  {albums.map((album) => (
-                    <option key={album.id} value={album.id}>
-                      {album.name} ({album.image_count} 张图片)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {isUpdatingRandomSource && (
-                <div className="flex items-center text-sm text-slate-500">
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  保存中...
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <RandomSourceConfigCard albums={albums} />
         </TabsContent>
 
         {/* 登录设置 */}
