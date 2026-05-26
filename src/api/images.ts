@@ -9,6 +9,7 @@ import type {
   UploadImageResponse,
   RandomImageResponse,
   RandomSourceAlbumConfig,
+  RandomImageParams,
 } from '@/types';
 
 // 图片列表查询参数 - 匹配后端Swagger定义 (images.ImageRequestBody)
@@ -188,48 +189,44 @@ export const getChunkedUploadStatus = (uploadId: string): Promise<ChunkedUploadS
   return get(`/api/v1/images/upload/chunked/status?upload_id=${uploadId}`);
 };
 
+export function buildRandomImageURL(params: RandomImageParams): string {
+  const query = new URLSearchParams();
+
+  if (params.format === 'json') {
+    query.set('format', 'json');
+  }
+
+  if (params.mode === 'album') {
+    if (!params.albumId || params.albumId <= 0) {
+      throw new Error('albumId is required when mode is "album"');
+    }
+    query.set('album_id', String(params.albumId));
+  }
+
+  if (params.mode === 'all') {
+    query.set('album_id', '0');
+  }
+
+  if (params.minWidth) query.set('min_width', String(params.minWidth));
+  if (params.minHeight) query.set('min_height', String(params.minHeight));
+  if (params.maxWidth) query.set('max_width', String(params.maxWidth));
+  if (params.maxHeight) query.set('max_height', String(params.maxHeight));
+  if (params.requireWebP) query.set('require_webp', 'true');
+  if (params.maxFileSize) query.set('max_file_size', String(params.maxFileSize));
+
+  const qs = query.toString();
+  return qs ? `/images/random?${qs}` : '/images/random';
+}
+
 // 获取公开随机图片（登录页背景用，无需认证）
 // GET /images/random
 export const fetchRandomImage = async (
-  format: 'json' | 'image' = 'json',
-  options?: {
-    albumId?: number | null;
-    minWidth?: number;
-    minHeight?: number;
-    maxWidth?: number;
-    maxHeight?: number;
-    requireWebp?: boolean;
-    maxFileSize?: number;
-  }
+  params: RandomImageParams
 ): Promise<RandomImageResponse['data'] | null> => {
-  const params = new URLSearchParams();
-  
-  // format 参数：只允许 json 或 image
-  if (format === 'json') {
-    params.append('format', 'json');
-  } else {
-    params.append('format', 'image');
-  }
-  
-  // album_id 参数：
-  // - 0 表示"所有公开图片"
-  // - >0 表示指定相册
-  // - null/undefined 时使用后台配置的随机图源相册
-  if (options?.albumId !== undefined && options?.albumId !== null) {
-    params.append('album_id', String(options.albumId));
-  }
-  
-  if (options?.minWidth) params.append('min_width', String(options.minWidth));
-  if (options?.minHeight) params.append('min_height', String(options.minHeight));
-  if (options?.maxWidth) params.append('max_width', String(options.maxWidth));
-  if (options?.maxHeight) params.append('max_height', String(options.maxHeight));
-  if (options?.requireWebp) params.append('require_webp', 'true');
-  if (options?.maxFileSize) params.append('max_file_size', String(options.maxFileSize));
-
-  const query = params.toString() ? `?${params.toString()}` : '';
+  const url = buildRandomImageURL(params);
 
   try {
-    const response = await fetch(`/images/random${query}`, {
+    const response = await fetch(url, {
       headers: {
         Accept: 'image/webp,image/avif,image/*',
       },
@@ -239,31 +236,26 @@ export const fetchRandomImage = async (
     if (response.status === 204) {
       return null;
     }
-    
-    // 400: 请求参数不合法
-    if (response.status === 400) {
-      const errorData = await response.json().catch(() => ({ msg: 'Invalid request parameters' }));
-      throw new Error(errorData.msg || 'Invalid request parameters');
-    }
-    
-    // 500: 服务端查询失败
-    if (response.status === 500) {
-      throw new Error('Server error');
+
+    // 403: Random API disabled
+    if (response.status === 403) {
+      return null;
     }
 
     if (!response.ok) {
-      throw new Error(`HTTP error: ${response.status}`);
+      console.warn(`Random image fetch failed: HTTP ${response.status}`);
+      return null;
     }
 
-    if (format === 'json') {
+    if (params.format === 'json') {
       const data: RandomImageResponse = await response.json();
       return data.data;
     }
 
     return null;
   } catch (error) {
-    // 重新抛出错误，让调用者处理
-    throw error;
+    console.warn('Random image fetch error:', error);
+    return null;
   }
 };
 
@@ -273,9 +265,6 @@ export const fetchRandomSourceAlbum = (): Promise<RandomSourceAlbumConfig> => {
 };
 
 // 设置随机图源相册（admin）- POST /api/v1/admin/random-source-album
-export const updateRandomSourceAlbum = (albumId: number | null, includeAllPublic?: boolean): Promise<void> => {
-  return post('/api/v1/admin/random-source-album', {
-    album_id: albumId,
-    include_all_public: includeAllPublic,
-  });
+export const updateRandomSourceAlbum = (config: RandomSourceAlbumConfig): Promise<void> => {
+  return post('/api/v1/admin/random-source-album', config);
 };
