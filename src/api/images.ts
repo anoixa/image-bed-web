@@ -218,12 +218,12 @@ export function buildRandomImageURL(params: RandomImageParams): string {
   return qs ? `/images/random?${qs}` : '/images/random';
 }
 
-// 获取公开随机图片（登录页背景用，无需认证）
-// GET /images/random
+// 获取公开随机图片元数据（登录页背景用，无需认证）
+// GET /images/random?format=json
 export const fetchRandomImage = async (
-  params: RandomImageParams
+  params: Omit<RandomImageParams, 'format'>
 ): Promise<RandomImageResponse['data'] | null> => {
-  const url = buildRandomImageURL(params);
+  const url = buildRandomImageURL({ ...params, format: 'json' });
 
   try {
     const response = await fetch(url, {
@@ -247,12 +247,8 @@ export const fetchRandomImage = async (
       return null;
     }
 
-    if (params.format === 'json') {
-      const data: RandomImageResponse = await response.json();
-      return data.data;
-    }
-
-    return null;
+    const data: RandomImageResponse = await response.json();
+    return data.data;
   } catch (error) {
     console.warn('Random image fetch error:', error);
     return null;

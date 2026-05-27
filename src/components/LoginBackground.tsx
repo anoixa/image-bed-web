@@ -21,7 +21,6 @@ export default function LoginBackground() {
     for (let i = 0; i < IMAGE_COUNT; i++) {
       const image = await fetchRandomImage({
         mode: 'configured',
-        format: 'json',
         minWidth: 1920,
         minHeight: 1080,
         requireWebP: true,
