@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Loader2, ImageIcon, FolderOpen, Filter, X, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Album as AlbumIcon, Trash2, CheckSquare, FolderMinus, FolderPlus } from 'lucide-react';
+import { ImageIcon, FolderOpen, Filter, X, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Album as AlbumIcon, CheckSquare } from 'lucide-react';
 import { PhotoProvider } from 'react-photo-view';
 import 'react-photo-view/dist/react-photo-view.css';
-import ImageCard from './ImageCard';
 import JustifiedGallery from './JustifiedGallery';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,17 +52,12 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   // Intersection Observer ref
   const loaderRef = useRef<HTMLDivElement>(null);
   
-  const hasInitialized = useRef(false);
-  const wasHidden = useRef(false);
-  const currentSearchRef = useRef(searchQuery);
+  const inFlightRequestRef = useRef<string | null>(null);
+  const latestRequestIdRef = useRef(0);
 
   // 批量操作状态
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedImages, setSelectedImages] = useState<Set<string>>(new Set());
-  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
-  const [isBatchRemoving, setIsBatchRemoving] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   
   // 单张图片删除确认状态
   const [showSingleDeleteConfirm, setShowSingleDeleteConfirm] = useState(false);
@@ -81,30 +74,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       .catch(console.error);
   }, []);
 
-  const initialAlbumIdRef = useRef(effectiveAlbumId);
-  const initialAlbumsRef = useRef<Album[]>([]);
-  
   useEffect(() => {
-    initialAlbumsRef.current = albums;
-  }, [albums]);
-
-  useEffect(() => {
-    const albumId = initialAlbumIdRef.current;
-    const albumsList = initialAlbumsRef.current;
-    
-    if (albumId && albumsList.length > 0) {
-      const album = albumsList.find(a => a.id === albumId);
+    if (effectiveAlbumId && albums.length > 0) {
+      const album = albums.find(a => a.id === effectiveAlbumId);
       setCurrentAlbum(album || null);
-      if (album && !hasInitialized.current) {
-        setAlbumFilter(album.id);
-      }
     } else {
       setCurrentAlbum(null);
-      if (!hasInitialized.current) {
-        setAlbumFilter('all');
-      }
     }
-  }, []); // 空依赖，只在挂载时执行一次
+  }, [albums, effectiveAlbumId]);
 
   const hasActiveFilters = visibilityFilter !== 'all' || albumFilter !== 'all';
 
@@ -116,6 +93,23 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   };
 
   const loadImages = useCallback(async (page: number = 1, append: boolean = false) => {
+    const requestKey = JSON.stringify({
+      page,
+      append,
+      albumFilter,
+      search: searchQuery?.trim() || '',
+      sortBy,
+      sortOrder,
+    });
+
+    if (inFlightRequestRef.current === requestKey) {
+      return;
+    }
+
+    inFlightRequestRef.current = requestKey;
+    latestRequestIdRef.current += 1;
+    const requestId = latestRequestIdRef.current;
+
     if (page === 1) {
       setLoading(true);
     }
@@ -138,7 +132,15 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
       const response = await fetchImages(params);
 
-      const items = response?.items || [];
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
+
+      const items = [...(response?.items || [])].sort((a, b) => {
+        const aValue = sortBy === 'file_size' ? a.file_size : a.created_at;
+        const bValue = sortBy === 'file_size' ? b.file_size : b.created_at;
+        return sortOrder === 'desc' ? bValue - aValue : aValue - bValue;
+      });
       const total = response?.total || 0;
       const perPage = response?.per_page || 20;
 
@@ -165,27 +167,15 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         });
       }
     } finally {
-      setLoading(false);
-      setHasLoaded(true);
+      if (inFlightRequestRef.current === requestKey) {
+        inFlightRequestRef.current = null;
+      }
+      if (requestId === latestRequestIdRef.current) {
+        setLoading(false);
+        setHasLoaded(true);
+      }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibilityFilter, albumFilter, sortBy, sortOrder, effectiveAlbumId, searchQuery]);
-
-
-  // useEffect(() => {
-  //   const handleVisibilityChange = () => {
-  //     if (document.visibilityState === 'hidden') {
-  //       wasHidden.current = true;
-  //     } else if (document.visibilityState === 'visible' && wasHidden.current) {
-  //       wasHidden.current = false;
-  //       if (images.length > 0) {
-  //         loadImages(1, false);
-  //       }
-  //     }
-  //   };
-  //   document.addEventListener('visibilitychange', handleVisibilityChange);
-  //   return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  // }, [loadImages, images.length]);
+  }, [albumFilter, searchQuery, sortBy, sortOrder]);
 
   // 监听外部刷新事件（如上传成功后）
   useEffect(() => {
@@ -206,27 +196,8 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   }, [effectiveAlbumId]);
 
   useEffect(() => {
-    if (!hasInitialized.current) {
-      loadImages(1, false);
-      hasInitialized.current = true;
-      currentSearchRef.current = searchQuery;
-    }
+    loadImages(1, false);
   }, [loadImages]);
-
-  useEffect(() => {
-    if (hasInitialized.current && searchQuery !== currentSearchRef.current) {
-      currentSearchRef.current = searchQuery;
-      loadImages(1, false);
-    }
-  }, [searchQuery, loadImages]);
-
-  // 监听筛选条件变化，重新加载
-  useEffect(() => {
-    if (hasInitialized.current) {
-      loadImages(1, false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [albumFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -284,12 +255,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     }
   };
 
-  // 取消单张图片删除
-  const handleCancelSingleDelete = () => {
-    setShowSingleDeleteConfirm(false);
-    setImageToDelete(null);
-  };
-
   // 批量选择处理
   const handleSelectImage = (identifier: string, selected: boolean) => {
     setSelectedImages((prev) => {
@@ -341,7 +306,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const handleBatchDelete = async () => {
     if (selectedImages.size === 0) return;
     
-    setIsBatchDeleting(true);
     try {
       const identifiers = Array.from(selectedImages);
       await deleteImages(identifiers);
@@ -362,9 +326,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         description: error instanceof Error ? error.message : '请稍后重试',
         variant: 'destructive',
       });
-    } finally {
-      setIsBatchDeleting(false);
-      setShowDeleteConfirm(false);
     }
   };
 
@@ -372,7 +333,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const handleBatchRemoveFromAlbum = async () => {
     if (selectedImages.size === 0 || !effectiveAlbumId) return;
     
-    setIsBatchRemoving(true);
     try {
       const identifiers = Array.from(selectedImages);
       const response = await removeImagesFromAlbum(effectiveAlbumId, identifiers);
@@ -393,9 +353,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         description: error instanceof Error ? error.message : '请稍后重试',
         variant: 'destructive',
       });
-    } finally {
-      setIsBatchRemoving(false);
-      setShowRemoveConfirm(false);
     }
   };
 
@@ -653,30 +610,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         <p className="text-slate-500">{subtitle}</p>
       </div>
 
-      {/* 删除确认对话框 */}
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        title="确认批量删除"
-        description={`确定要删除选中的 ${selectedImages.size} 张图片吗？此操作不可恢复。`}
-        onConfirm={handleBatchDelete}
-        confirmText="删除"
-        cancelText="取消"
-        variant="destructive"
-      />
-
-      {/* 从相册移除确认对话框 */}
-      <ConfirmDialog
-        open={showRemoveConfirm}
-        onOpenChange={setShowRemoveConfirm}
-        title="确认从相册移除"
-        description={`确定要从相册中移除选中的 ${selectedImages.size} 张图片吗？图片不会被删除，只是从当前相册中移除。`}
-        onConfirm={handleBatchRemoveFromAlbum}
-        confirmText="移除"
-        cancelText="取消"
-        variant="default"
-      />
-
       {/* 单张图片删除确认对话框 */}
       <ConfirmDialog
         open={showSingleDeleteConfirm}
@@ -697,15 +630,12 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         error={error}
         currentAlbum={currentAlbum}
         albums={albums}
-        title={title}
-        subtitle={subtitle}
         visibilityFilter={visibilityFilter}
         albumFilter={albumFilter}
         sortBy={sortBy}
         sortOrder={sortOrder}
         isBatchMode={isBatchMode}
         selectedImages={selectedImages}
-        onLoadMore={() => loadImages(currentPage + 1, true)}
         onDelete={handleShowDeleteConfirm}
         onAddToAlbum={handleAddToAlbum}
         onBatchDelete={handleBatchDelete}
@@ -714,8 +644,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         onSelectImage={handleSelectImage}
         onSelectAll={handleSelectAll}
         onExitBatchMode={exitBatchMode}
-        onVisibilityChange={() => loadImages(1, false)}
-        onAlbumChange={() => loadImages(1, false)}
         setVisibilityFilter={setVisibilityFilter}
         setAlbumFilter={setAlbumFilter}
         setSortBy={setSortBy}

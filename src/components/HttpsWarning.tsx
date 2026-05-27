@@ -1,34 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function HttpsWarning() {
-  const [showWarning, setShowWarning] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    // 检测当前协议
+  const [showWarning] = useState(() => {
     const isHttps = window.location.protocol === 'https:';
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // 如果不是 HTTPS 且不是本地开发环境，显示警告
-    if (!isHttps && !isLocalhost) {
-      setShowWarning(true);
-    }
-  }, []);
+    return !isHttps && !isLocalhost;
+  });
+  const [dismissed, setDismissed] = useState(() => sessionStorage.getItem('https-warning-dismissed') === 'true');
 
   const handleDismiss = () => {
     setDismissed(true);
     // 保存到 sessionStorage，当前会话不再显示
     sessionStorage.setItem('https-warning-dismissed', 'true');
   };
-
-  // 检查是否已经关闭过
-  useEffect(() => {
-    if (sessionStorage.getItem('https-warning-dismissed') === 'true') {
-      setDismissed(true);
-    }
-  }, []);
 
   if (!showWarning || dismissed) {
     return null;

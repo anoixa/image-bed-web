@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   User, Link2, Unlink, Loader2, ExternalLink, AlertCircle,
-  Shield, ShieldCheck, ShieldOff, Copy, Check, KeyRound,
+  Shield, ShieldCheck, ShieldOff, Copy, Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

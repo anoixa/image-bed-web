@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link2, Trash2, Maximize2, FolderPlus, FolderMinus, Eye, EyeOff } from 'lucide-react';
+import { Link2, Trash2, FolderPlus, FolderMinus, Eye, EyeOff } from 'lucide-react';
 import { PhotoView } from 'react-photo-view';
 import type { Image } from '@/types';
 import { Button } from '@/components/ui/button';

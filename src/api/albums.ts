@@ -1,5 +1,5 @@
 import { get, post, put, del } from '@/lib/request';
-import type { Album, AlbumDetail, AlbumImage } from '@/types';
+import type { Album, AlbumDetail } from '@/types';
 
 // 相册列表响应结构
 interface AlbumsResponse {

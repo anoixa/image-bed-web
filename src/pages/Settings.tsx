@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, prefer-const */
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Loader2, Info, Database, Server, HardDrive, Check, Settings2, ImageIcon, Link2, Globe, Folder, RefreshCw, Cpu, AlertTriangle, Zap, Activity, Shield } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';

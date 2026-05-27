@@ -9,6 +9,7 @@ import {
   verify2FA as verify2FAAPI,
 } from '@/api/auth';
 import type { LoginSuccessResponse } from '@/types';
+import { clearAuthToken, setAuthToken } from '@/lib/authToken';
 
 interface AuthState {
   user: User | null;
@@ -62,6 +63,7 @@ export const useAuthStore = create<AuthState>()(
           const successResponse = response as LoginSuccessResponse;
           const token = successResponse.access_token.replace('Bearer ', '');
           const expiry = successResponse.access_token_expiry * 1000;
+          setAuthToken(token, expiry);
 
           const user = await getCurrentUser();
 
@@ -75,7 +77,8 @@ export const useAuthStore = create<AuthState>()(
           });
           return { requires2FA: false };
         } catch (error) {
-          set({ isLoading: false });
+          clearAuthToken();
+          set({ isLoading: false, accessToken: null, accessTokenExpiry: null });
           throw error;
         }
       },
@@ -91,6 +94,7 @@ export const useAuthStore = create<AuthState>()(
           const response = await verify2FAAPI({ ticket: twoFATicket, code });
           const token = response.access_token.replace('Bearer ', '');
           const expiry = response.access_token_expiry * 1000;
+          setAuthToken(token, expiry);
 
           const user = await getCurrentUser();
 
@@ -103,7 +107,8 @@ export const useAuthStore = create<AuthState>()(
             twoFATicket: null,
           });
         } catch (error) {
-          set({ isLoading: false });
+          clearAuthToken();
+          set({ isLoading: false, accessToken: null, accessTokenExpiry: null });
           throw error;
         }
       },
@@ -114,11 +119,13 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // 即使请求失败也清除本地状态
         } finally {
+          clearAuthToken();
           set({
             user: null,
             accessToken: null,
             accessTokenExpiry: null,
             isAuthenticated: false,
+            twoFATicket: null,
           });
         }
       },
@@ -137,6 +144,7 @@ export const useAuthStore = create<AuthState>()(
 
           const token = response.access_token.replace('Bearer ', '');
           const expiry = response.access_token_expiry * 1000;
+          setAuthToken(token, expiry);
 
           // 刷新后重新获取用户信息
           const user = await getCurrentUser();
@@ -150,13 +158,15 @@ export const useAuthStore = create<AuthState>()(
           });
 
           return true;
-        } catch (error) {
+        } catch {
+          clearAuthToken();
           set({
             user: null,
             accessToken: null,
             accessTokenExpiry: null,
             isAuthenticated: false,
             isRefreshing: false,
+            twoFATicket: null,
           });
           return false;
         }
@@ -193,11 +203,13 @@ export const useAuthStore = create<AuthState>()(
         if (!accessToken) {
           const ok = await refreshAccessToken();
           if (!ok) {
+            clearAuthToken();
             set({
               user: null,
               accessToken: null,
               accessTokenExpiry: null,
               isAuthenticated: false,
+              twoFATicket: null,
             });
           }
           return;
@@ -210,11 +222,13 @@ export const useAuthStore = create<AuthState>()(
         if (timeUntilExpiry <= 0) {
           const ok = await refreshAccessToken();
           if (!ok) {
+            clearAuthToken();
             set({
               user: null,
               accessToken: null,
               accessTokenExpiry: null,
               isAuthenticated: false,
+              twoFATicket: null,
             });
           }
           return;
@@ -229,23 +243,30 @@ export const useAuthStore = create<AuthState>()(
           });
         } catch {
           // /me 失败（如 401），清除状态
+          clearAuthToken();
           set({
             user: null,
             accessToken: null,
             accessTokenExpiry: null,
             isAuthenticated: false,
+            twoFATicket: null,
           });
         }
       },
     }),
     {
       name: 'auth-storage',
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<Pick<AuthState, 'user' | 'isAuthenticated'>>;
+        return {
+          user: state.user ?? null,
+          isAuthenticated: false,
+        };
+      },
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        accessTokenExpiry: state.accessTokenExpiry,
         isAuthenticated: state.isAuthenticated,
-        twoFATicket: state.twoFATicket,
       }),
     }
   )

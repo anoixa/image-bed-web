@@ -12,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Link } from 'react-router-dom';
 import JustifiedImageCard from './JustifiedImageCard';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -23,15 +22,12 @@ interface JustifiedGalleryProps {
   error: string | null;
   currentAlbum?: Album | null;
   albums?: Album[];
-  title?: string;
-  subtitle?: string;
   visibilityFilter?: 'all' | 'public' | 'private';
   albumFilter?: number | 'all';
   sortBy?: 'created_at' | 'file_size';
   sortOrder?: 'asc' | 'desc';
   isBatchMode?: boolean;
   selectedImages?: Set<string>;
-  onLoadMore?: () => void;
   onDelete?: (identifier: string) => void;
   onAddToAlbum?: (identifier: string) => void;
   onBatchDelete?: () => void;
@@ -40,8 +36,6 @@ interface JustifiedGalleryProps {
   onSelectImage?: (identifier: string, selected: boolean) => void;
   onSelectAll?: () => void;
   onExitBatchMode?: () => void;
-  onVisibilityChange?: () => void;
-  onAlbumChange?: () => void;
   setVisibilityFilter?: (filter: 'all' | 'public' | 'private') => void;
   setAlbumFilter?: (filter: number | 'all') => void;
   setSortBy?: (sort: 'created_at' | 'file_size') => void;
@@ -99,15 +93,12 @@ export default function JustifiedGallery({
   error,
   currentAlbum,
   albums = [],
-  title,
-  subtitle,
   visibilityFilter = 'all',
   albumFilter = 'all',
   sortBy = 'created_at',
   sortOrder = 'desc',
   isBatchMode = false,
   selectedImages = new Set(),
-  onLoadMore,
   onDelete,
   onAddToAlbum,
   onBatchDelete,
@@ -116,8 +107,6 @@ export default function JustifiedGallery({
   onSelectImage,
   onSelectAll,
   onExitBatchMode,
-  onVisibilityChange,
-  onAlbumChange,
   setVisibilityFilter,
   setAlbumFilter,
   setSortBy,
@@ -128,38 +117,40 @@ export default function JustifiedGallery({
 }: JustifiedGalleryProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [showAddToAlbumConfirm, setShowAddToAlbumConfirm] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const hasMeasuredRef = useRef(false);
 
   // 使用 ResizeObserver 获取容器宽度
   useEffect(() => {
     const node = containerRef.current;
-    if (!node || hasMeasuredRef.current) return;
+    if (!node) return;
+    let frameId: number | null = null;
     
     const updateWidth = () => {
-      const rect = node.getBoundingClientRect();
-      const width = rect.width;
-      if (width > 0) {
-        setContainerWidth(width);
-        hasMeasuredRef.current = true;
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
       }
+      frameId = requestAnimationFrame(() => {
+        const width = node.getBoundingClientRect().width;
+        if (width > 0) {
+          setContainerWidth((prev) => (prev === width ? prev : width));
+        }
+        frameId = null;
+      });
     };
     
-    // 立即测量一次
     updateWidth();
-    
-    // 如果还没获取到，延迟再试一次（确保 DOM 已渲染）
-    if (containerWidth === 0) {
-      requestAnimationFrame(updateWidth);
-    }
     
     const observer = new ResizeObserver(updateWidth);
     observer.observe(node);
     
-    return () => observer.disconnect();
-  }, [images.length]); // 当图片数量变化时重新测量
+    return () => {
+      observer.disconnect();
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
 
   // 将图片分组到行
   const rows = useMemo(() => {

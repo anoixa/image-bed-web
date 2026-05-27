@@ -3,7 +3,7 @@ import { Folder, Plus, Trash2, Edit2, X, Check, Loader2, Image, ExternalLink } f
 import ConfirmDialog from '@/components/ConfirmDialog';
 
 // 相册封面组件
-function AlbumCover({ coverUrl, name }: { coverUrl?: string; name: string }) {
+function AlbumCover({ coverUrl }: { coverUrl?: string }) {
   const [hasError, setHasError] = useState(false);
   const hasCover = coverUrl && coverUrl.trim() !== '';
 
@@ -280,7 +280,7 @@ export default function Albums() {
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center overflow-hidden">
-                            <AlbumCover coverUrl={album.cover_url} name={album.name} />
+                            <AlbumCover coverUrl={album.cover_url} />
                           </div>
                           <div>
                             <h3 className="font-semibold text-slate-800 group-hover:text-indigo-600 transition-colors">

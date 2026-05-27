@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { UploadCloud, X, FileImage, Loader2, CheckCircle2, AlertCircle, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,20 +19,7 @@ interface BatchLinksContentProps {
 
 function BatchLinksContent({ images, format, onCopyAll }: BatchLinksContentProps) {
   const getLinkValue = (image: UploadImageResponse) => {
-    const url = image.links?.url || image.links?.original || '';
-    const filename = image.filename || 'image';
-    
-    switch (format) {
-      case 'html':
-        return `<img src="${url}" alt="${filename}" />`;
-      case 'markdown':
-        return `![${filename}](${url})`;
-      case 'bbcode':
-        return `[img]${url}[/img]`;
-      case 'url':
-      default:
-        return url;
-    }
+    return getImageLinkValue(image, format);
   };
 
   const allLinksText = images.map(getLinkValue).join('\n');
@@ -90,6 +77,109 @@ interface LinkFormat {
   value: string;
 }
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_FILES_PER_BATCH = 30;
+const THUMBNAIL_CONCURRENCY = 3;
+const ALLOWED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+]);
+
+const generateUploadId = () => Math.random().toString(36).substring(2, 9);
+
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
+function escapeMarkdownText(value: string): string {
+  return value.replace(/([\\[\]!])/g, '\\$1');
+}
+
+function escapeMarkdownUrl(value: string): string {
+  return value.replace(/([\\()])/g, '\\$1');
+}
+
+function getSafeImageUrl(value?: string): string {
+  const url = value?.trim();
+  if (!url) return '';
+
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (['http:', 'https:', 'blob:'].includes(parsed.protocol)) {
+      return url;
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+}
+
+function getImageLinkValue(image: UploadImageResponse, format: 'url' | 'html' | 'markdown' | 'bbcode'): string {
+  const url = getSafeImageUrl(image.links?.url || image.links?.original);
+  const filename = image.filename || 'image';
+
+  if (!url) return '';
+
+  switch (format) {
+    case 'html':
+      return `<img src="${escapeHtmlAttribute(url)}" alt="${escapeHtmlAttribute(filename)}" />`;
+    case 'markdown':
+      return `![${escapeMarkdownText(filename)}](${escapeMarkdownUrl(url)})`;
+    case 'bbcode':
+      return `[img]${url.replace(/\[/g, '%5B').replace(/\]/g, '%5D')}[/img]`;
+    case 'url':
+    default:
+      return url;
+  }
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index]);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
+}
+
 export default function UploadModal({ open, onOpenChange, onSuccess, storageId }: UploadModalProps) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -99,8 +189,6 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [allUploadedImages, setAllUploadedImages] = useState<UploadImageResponse[]>([]);
   const [totalProgress, setTotalProgress] = useState(0);
-
-  const generateId = () => Math.random().toString(36).substring(2, 9);
 
   // 生成缩略图（对大图片进行压缩）
   const generateThumbnail = useCallback((file: File, maxWidth: number = 200, maxHeight: number = 200): Promise<string> => {
@@ -172,30 +260,45 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
   const handleFileSelect = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return;
 
-    const imageFiles = Array.from(fileList).filter((file) => file.type.startsWith('image/'));
+    const incomingFiles = Array.from(fileList);
+    const validFiles = incomingFiles.filter((file) =>
+      ALLOWED_IMAGE_TYPES.has(file.type) && file.size <= MAX_FILE_SIZE
+    );
+    const rejectedCount = incomingFiles.length - validFiles.length;
+    const availableSlots = Math.max(MAX_FILES_PER_BATCH - files.length, 0);
+    const imageFiles = validFiles.slice(0, availableSlots);
 
     if (imageFiles.length === 0) {
       toast({
         title: '请选择图片文件',
-        description: '仅支持 JPG、PNG、GIF、WebP 等图片格式',
+        description: `仅支持 JPG、PNG、GIF、WebP、AVIF，单文件最大 ${formatFileSize(MAX_FILE_SIZE)}`,
         variant: 'destructive',
       });
       return;
     }
 
+    if (rejectedCount > 0 || validFiles.length > imageFiles.length) {
+      toast({
+        title: '部分文件已跳过',
+        description: `已跳过 ${rejectedCount + validFiles.length - imageFiles.length} 个不符合要求或超出数量限制的文件`,
+      });
+    }
+
     // 为每个文件生成缩略图
-    const newFiles: UploadFile[] = await Promise.all(
-      imageFiles.map(async (file) => ({
+    const newFiles: UploadFile[] = await mapWithConcurrency(
+      imageFiles,
+      THUMBNAIL_CONCURRENCY,
+      async (file) => ({
         file,
         preview: await generateThumbnail(file, 300, 300),
-        id: generateId(),
+        id: generateUploadId(),
         progress: 0,
         status: 'pending',
-      }))
+      })
     );
 
     setFiles((prev) => [...prev, ...newFiles]);
-  }, [generateThumbnail]);
+  }, [files.length, generateThumbnail]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -234,13 +337,11 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
 
 
   const generateLinkFormats = (image: UploadImageResponse): LinkFormat[] => {
-    const url = image.links?.url || '';
-    
     const formats: LinkFormat[] = [
-      { key: 'url', label: 'URL', value: url },
-      { key: 'html', label: 'HTML', value: image.links?.html || (url ? `<img src="${url}" alt="${image.filename || 'image'}" />` : '') },
-      { key: 'markdown', label: 'Markdown', value: image.links?.markdown || (url ? `![${image.filename || 'image'}](${url})` : '') },
-      { key: 'bbcode', label: 'BBCode', value: image.links?.bbcode || (url ? `[img]${url}[/img]` : '') },
+      { key: 'url', label: 'URL', value: getImageLinkValue(image, 'url') },
+      { key: 'html', label: 'HTML', value: getImageLinkValue(image, 'html') },
+      { key: 'markdown', label: 'Markdown', value: getImageLinkValue(image, 'markdown') },
+      { key: 'bbcode', label: 'BBCode', value: getImageLinkValue(image, 'bbcode') },
     ];
     return formats;
   };
@@ -423,20 +524,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
 
   const copyAllLinks = async (format: 'url' | 'html' | 'markdown' | 'bbcode') => {
     const getLinkValue = (image: UploadImageResponse) => {
-      const url = image.links?.url || image.links?.original || '';
-      const filename = image.filename || 'image';
-      
-      switch (format) {
-        case 'html':
-          return `<img src="${url}" alt="${filename}" />`;
-        case 'markdown':
-          return `![${filename}](${url})`;
-        case 'bbcode':
-          return `[img]${url}[/img]`;
-        case 'url':
-        default:
-          return url;
-      }
+      return getImageLinkValue(image, format);
     };
 
     const allLinks = allUploadedImages.map(getLinkValue).join('\n');
@@ -470,13 +558,6 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
         variant: 'destructive',
       });
     }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024 * 1024) {
-      return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-    return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   };
 
   // 获取最后一个成功的图片
@@ -533,7 +614,9 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
                   <p className="text-sm text-slate-600 mb-1">
                     拖拽图片到此处，或 <span className="text-indigo-600 font-medium">点击选择</span>
                   </p>
-                  <p className="text-xs text-slate-400">支持 JPG、PNG、GIF、WebP 等格式，单文件最大 10MB</p>
+                  <p className="text-xs text-slate-400">
+                    支持 JPG、PNG、GIF、WebP、AVIF，单文件最大 {formatFileSize(MAX_FILE_SIZE)}
+                  </p>
                 </label>
               </motion.div>
 

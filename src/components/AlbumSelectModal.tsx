@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, FolderPlus, Check } from 'lucide-react';
+import { FolderPlus, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { fetchAlbums, addImagesToAlbum } from '@/api/albums';
@@ -38,7 +38,7 @@ export default function AlbumSelectModal({
     try {
       const data = await fetchAlbums(1, 100);
       setAlbums(data);
-    } catch (error) {
+    } catch {
       toast({
         title: '加载失败',
         description: '无法加载相册列表',

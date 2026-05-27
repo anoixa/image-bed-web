@@ -1,5 +1,5 @@
 import { get, post, del } from '@/lib/request';
-import type { Token, CreateTokenRequest, CreateTokenResponse } from '@/types';
+import type { Token, CreateTokenResponse } from '@/types';
 
 // Token列表响应结构
 interface TokensResponse {

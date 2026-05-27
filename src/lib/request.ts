@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse, LoginSuccessResponse } from '@/types';
+import { clearAuthToken, getAuthToken, getAuthTokenExpiry, setAuthToken } from '@/lib/authToken';
 
 const request: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -44,60 +45,14 @@ let refreshSubscribers: Array<{
 }> = [];
 
 const TOKEN_REFRESH_THRESHOLD = 10 * 60 * 1000; // 10分钟
-
-/**
- * 获取存储的 token 过期时间
- */
-function getTokenExpiry(): number | null {
-  const storageData = localStorage.getItem('auth-storage');
-  if (storageData) {
-    try {
-      const parsed = JSON.parse(storageData);
-      return parsed.state?.accessTokenExpiry || null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-/**
- * 获取存储的 access token
- */
-function getAccessToken(): string | null {
-  const storageData = localStorage.getItem('auth-storage');
-  if (storageData) {
-    try {
-      const parsed = JSON.parse(storageData);
-      return parsed.state?.accessToken || null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-/**
- * 设置新的 access token 到存储
- */
-function setAccessToken(token: string, expiry: number) {
-  const storageData = localStorage.getItem('auth-storage');
-  if (storageData) {
-    try {
-      const parsed = JSON.parse(storageData);
-      parsed.state.accessToken = token;
-      parsed.state.accessTokenExpiry = expiry;
-      localStorage.setItem('auth-storage', JSON.stringify(parsed));
-    } catch {
-      // 解析失败时静默处理
-    }
-  }
-}
+// 排除不需要刷新 token 的接口
+const EXCLUDE_FROM_REFRESH = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
 
 /**
  * 清除认证状态并跳转登录页
  */
 function clearAuthState() {
+  clearAuthToken();
   localStorage.removeItem('auth-storage');
   window.location.href = '/login';
 }
@@ -112,7 +67,7 @@ async function performTokenRefresh(): Promise<string> {
     const newToken = response.access_token.replace('Bearer ', '');
     const newExpiry = response.access_token_expiry * 1000;
 
-    setAccessToken(newToken, newExpiry);
+    setAuthToken(newToken, newExpiry);
 
     // 通知所有等待的请求
     refreshSubscribers.forEach(({ resolve }) => resolve(newToken));
@@ -167,8 +122,8 @@ function waitForRefresh(): Promise<string> {
  3. 如果 Token 即将过期或已过期，启动刷新流程
  */
 async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
-  const token = getAccessToken();
-  const expiry = getTokenExpiry();
+  const token = getAuthToken();
+  const expiry = getAuthTokenExpiry();
 
   if (!token || !expiry) {
     return token;
@@ -206,7 +161,8 @@ async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
 
 request.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = await checkAndRefreshTokenIfNeeded();
+    const isExcluded = EXCLUDE_FROM_REFRESH.some(url => config.url?.includes(url));
+    const token = isExcluded ? null : await checkAndRefreshTokenIfNeeded();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -231,9 +187,6 @@ request.interceptors.request.use(
 // ============================================
 // 响应拦截器 - 处理 401 和 Token 刷新
 // ============================================
-
-// 排除不需要刷新token的接口
-const EXCLUDE_FROM_REFRESH = ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout'];
 
 request.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {

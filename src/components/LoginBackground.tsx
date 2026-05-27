@@ -9,43 +9,50 @@ const ANIMATION_DURATION = 15;
 export default function LoginBackground() {
   const [images, setImages] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [hasImages, setHasImages] = useState(false);
 
   // 预加载图片池
-  const loadImages = useCallback(async () => {
-    const urls: string[] = [];
-
+  const loadImages = useCallback(async (signal: AbortSignal) => {
     // 尝试获取多张随机图片（要求有 WebP 变体，文件大小不超过 10MB）
     // 使用 configured 模式，不传 album_id，尊重后台配置的图源相册
-    for (let i = 0; i < IMAGE_COUNT; i++) {
-      const image = await fetchRandomImage({
+    const results = await Promise.allSettled(
+      Array.from({ length: IMAGE_COUNT }, () => fetchRandomImage({
         mode: 'configured',
         minWidth: 1920,
         minHeight: 1080,
         requireWebP: true,
         maxFileSize: 10 * 1024 * 1024,
-      });
+      }, signal))
+    );
 
-      if (image) {
+    if (signal.aborted) return;
+
+    const urls: string[] = [];
+    results.forEach((result) => {
+      if (result.status === 'fulfilled' && result.value) {
         // 优先使用 WebP 变体
-        const imageUrl = image?.variant?.url || image?.url;
+        const imageUrl = result.value?.variant?.url || result.value?.url;
         if (imageUrl && !urls.includes(imageUrl)) {
           urls.push(imageUrl);
         }
       }
-    }
+    });
 
     if (urls.length > 0) {
       setImages(urls);
       setHasImages(true);
     }
-
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    loadImages();
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void loadImages(controller.signal);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [loadImages]);
 
   // 定时切换

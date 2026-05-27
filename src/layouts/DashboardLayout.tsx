@@ -19,7 +19,6 @@ import {
   ChevronDown,
   Check,
   HardDrive,
-  Server,
   BookOpen,
   Cloud,
   ChevronLeft,
@@ -29,7 +28,6 @@ import {
 } from 'lucide-react';
 import { changePassword } from '@/api/auth';
 import { setDefaultStorageConfig } from '@/api/configs';
-import type { StorageConfig } from '@/types';
 import { useStorageConfigsStore } from '@/store/storageConfigs';
 import {
   Dialog,
@@ -74,7 +72,6 @@ const allNavItems: NavItem[] = [
 // 导航项链接组件 - 保留 URL 查询参数
 function NavItemLink({ item, onNavigate, collapsed = false }: { item: NavItem; onNavigate?: () => void; collapsed?: boolean }) {
   const Icon = item.icon;
-  const [searchParams] = useSearchParams();
   const location = useLocation();
 
   const to = {

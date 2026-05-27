@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Code, Copy, Check, Key, Image as ImageIcon, Folder, Upload, Trash2, Eye, Search, AlertCircle } from 'lucide-react';
+import { BookOpen, Code, Copy, Check, Key, Image as ImageIcon, Folder, Upload, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

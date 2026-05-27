@@ -221,14 +221,16 @@ export function buildRandomImageURL(params: RandomImageParams): string {
 // 获取公开随机图片元数据（登录页背景用，无需认证）
 // GET /images/random?format=json
 export const fetchRandomImage = async (
-  params: Omit<RandomImageParams, 'format'>
+  params: Omit<RandomImageParams, 'format'>,
+  signal?: AbortSignal
 ): Promise<RandomImageResponse['data'] | null> => {
   const url = buildRandomImageURL({ ...params, format: 'json' });
 
   try {
     const response = await fetch(url, {
+      signal,
       headers: {
-        Accept: 'image/webp,image/avif,image/*',
+        Accept: 'application/json',
       },
     });
 
