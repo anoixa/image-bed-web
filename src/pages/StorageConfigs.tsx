@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Loader2, Server, HardDrive, Database, Pencil, Star, TestTube, Cloud } from 'lucide-react';
+import { Plus, Trash2, Loader2, Server, HardDrive, Database, Pencil, Star, TestTube, Cloud, Power, PowerOff } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,8 @@ import {
   deleteStorageConfig,
   setDefaultStorageConfig,
   testStorageConfig,
+  enableStorageConfig,
+  disableStorageConfig,
 } from '@/api/configs';
 import type { StorageConfig } from '@/types';
 import { toast } from '@/components/ui/use-toast';
@@ -31,6 +33,7 @@ type StorageType = 'local' | 's3' | 'webdav';
 interface StorageFormData {
   name: string;
   config: Record<string, string>;
+  is_enabled: boolean;
   is_default: boolean;
 }
 
@@ -158,6 +161,7 @@ interface StorageFormProps {
   onNameChange: (name: string) => void;
   onTypeChange: (type: StorageType) => void;
   onConfigChange: (key: string, value: string) => void;
+  onIsEnabledChange: (isEnabled: boolean) => void;
   onIsDefaultChange: (isDefault: boolean) => void;
 }
 
@@ -169,6 +173,7 @@ function StorageForm({
   onNameChange,
   onTypeChange,
   onConfigChange,
+  onIsEnabledChange,
   onIsDefaultChange,
 }: StorageFormProps) {
   return (
@@ -202,14 +207,36 @@ function StorageForm({
         />
       </div>
 
-      <div className="flex items-center gap-2 pt-2">
-        <Switch
-          id="is_default"
-          checked={formData.is_default}
-          onCheckedChange={onIsDefaultChange}
-        />
-        <Label htmlFor="is_default">设为默认存储</Label>
-      </div>
+      {!isEditing && (
+        <div className="space-y-4 pt-2">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="is_enabled"
+              checked={formData.is_enabled}
+              onCheckedChange={onIsEnabledChange}
+            />
+            <div>
+              <Label htmlFor="is_enabled">创建后启用</Label>
+              <p className="text-xs text-slate-500">禁用时保留已有图片读取，但拒绝新上传和变体写入。</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Switch
+              id="is_default"
+              checked={formData.is_default}
+              disabled={!formData.is_enabled}
+              onCheckedChange={onIsDefaultChange}
+            />
+            <div>
+              <Label htmlFor="is_default">设为默认存储</Label>
+              {!formData.is_enabled && (
+                <p className="text-xs text-slate-500">只有启用的存储才能设为默认。</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -224,6 +251,7 @@ export default function StorageConfigs() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [testingId, setTestingId] = useState<number | null>(null);
+  const [mutatingId, setMutatingId] = useState<number | null>(null);
   const [selectedType, setSelectedType] = useState<StorageType>('local');
   
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -242,6 +270,7 @@ export default function StorageConfigs() {
   const [formData, setFormData] = useState<StorageFormData>({
     name: '',
     config: {},
+    is_enabled: true,
     is_default: false,
   });
 
@@ -273,6 +302,7 @@ export default function StorageConfigs() {
         name: formData.name,
         category: 'storage',
         config: { type: selectedType, ...formData.config },
+        is_enabled: formData.is_enabled,
         is_default: formData.is_default,
       });
       toast({ title: '创建成功', description: '存储配置已创建' });
@@ -296,7 +326,6 @@ export default function StorageConfigs() {
       await updateStorageConfig(editingId, {
         name: formData.name,
         config: formData.config,
-        is_default: formData.is_default,
       });
       toast({ title: '更新成功', description: '存储配置已更新' });
       setIsEditOpen(false);
@@ -340,6 +369,17 @@ export default function StorageConfigs() {
   };
 
   const handleSetDefault = async (id: number) => {
+    const config = storageConfigs.find(item => item.id === id);
+    if (!config?.is_enabled) {
+      toast({
+        title: '无法设置默认存储',
+        description: '请先启用该存储配置。',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setMutatingId(id);
     try {
       await setDefaultStorageConfig(id);
       toast({ title: '设置成功', description: '已设为默认存储' });
@@ -352,7 +392,63 @@ export default function StorageConfigs() {
         description: error instanceof Error ? error.message : '请稍后重试',
         variant: 'destructive',
       });
+    } finally {
+      setMutatingId(null);
     }
+  };
+
+  const handleToggleEnabled = (config: StorageConfig) => {
+    if (config.is_enabled && config.is_default) {
+      toast({
+        title: '无法禁用默认存储',
+        description: '请先将其他已启用的存储设为默认。',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const mutate = async () => {
+      setMutatingId(config.id);
+      try {
+        if (config.is_enabled) {
+          await disableStorageConfig(config.id);
+          toast({
+            title: '存储已禁用',
+            description: '已有图片仍可读取，新上传和变体写入已暂停。',
+          });
+        } else {
+          await enableStorageConfig(config.id);
+          toast({
+            title: '存储已启用',
+            description: '该存储现在可以接收新写入。',
+          });
+        }
+        await loadData();
+        await refreshStorageConfigs();
+      } catch (error) {
+        toast({
+          title: config.is_enabled ? '禁用失败' : '启用失败',
+          description: error instanceof Error ? error.message : '请稍后重试',
+          variant: 'destructive',
+        });
+      } finally {
+        setMutatingId(null);
+        setConfirmDialog(prev => ({ ...prev, open: false }));
+      }
+    };
+
+    if (!config.is_enabled) {
+      void mutate();
+      return;
+    }
+
+    setConfirmDialog({
+      open: true,
+      title: '确认禁用存储',
+      description: '禁用后将停止新上传和变体写入；已有图片仍可读取、下载和删除。重新启用后，待处理转换会自动恢复。',
+      variant: 'destructive',
+      onConfirm: mutate,
+    });
   };
 
   const handleTest = async (id: number) => {
@@ -376,6 +472,7 @@ export default function StorageConfigs() {
     setFormData({
       name: config.name,
       config: config.config as Record<string, string>,
+      is_enabled: config.is_enabled,
       is_default: config.is_default,
     });
     const storageType = (config.config as Record<string, string>)?.type as StorageType;
@@ -389,6 +486,7 @@ export default function StorageConfigs() {
     setFormData({
       name: '',
       config: {},
+      is_enabled: true,
       is_default: false,
     });
     setSelectedType('local');
@@ -413,7 +511,19 @@ export default function StorageConfigs() {
   }, []);
 
   const handleIsDefaultChange = useCallback((isDefault: boolean) => {
-    setFormData(prev => ({ ...prev, is_default: isDefault }));
+    setFormData(prev => ({
+      ...prev,
+      is_enabled: isDefault ? true : prev.is_enabled,
+      is_default: isDefault,
+    }));
+  }, []);
+
+  const handleIsEnabledChange = useCallback((isEnabled: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      is_enabled: isEnabled,
+      is_default: isEnabled ? prev.is_default : false,
+    }));
   }, []);
 
   const getStorageIcon = (type?: string) => {
@@ -458,6 +568,7 @@ export default function StorageConfigs() {
               onNameChange={handleNameChange}
               onTypeChange={handleTypeChange}
               onConfigChange={handleConfigChange}
+              onIsEnabledChange={handleIsEnabledChange}
               onIsDefaultChange={handleIsDefaultChange}
             />
             <div className="flex justify-end gap-3">
@@ -511,7 +622,7 @@ export default function StorageConfigs() {
                           {config.is_enabled ? (
                             <Badge variant="outline" className="text-xs text-green-600 border-green-600">启用</Badge>
                           ) : (
-                            <Badge variant="outline" className="text-xs text-slate-400">禁用</Badge>
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-500">只读（禁写）</Badge>
                           )}
                         </div>
                       </div>
@@ -523,7 +634,7 @@ export default function StorageConfigs() {
                     <p>创建于: {new Date(config.created_at).toLocaleDateString()}</p>
                   </div>
                   
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                  <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
                     <Button
                       variant="outline"
                       size="sm"
@@ -537,7 +648,7 @@ export default function StorageConfigs() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleTest(config.id)}
-                      disabled={testingId === config.id}
+                      disabled={testingId === config.id || mutatingId === config.id}
                     >
                       {testingId === config.id ? (
                         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -552,17 +663,37 @@ export default function StorageConfigs() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleSetDefault(config.id)}
+                        disabled={!config.is_enabled || mutatingId === config.id}
+                        title={config.is_enabled ? '设为默认存储' : '请先启用该存储'}
                       >
                         <Star className="h-4 w-4 mr-1" />
-                        设为默认
+                        {config.is_enabled ? '设为默认' : '先启用'}
                       </Button>
                     )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleEnabled(config)}
+                      disabled={mutatingId === config.id || (config.is_enabled && config.is_default)}
+                      title={config.is_enabled && config.is_default ? '请先切换默认存储' : undefined}
+                    >
+                      {mutatingId === config.id ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : config.is_enabled ? (
+                        <PowerOff className="h-4 w-4 mr-1" />
+                      ) : (
+                        <Power className="h-4 w-4 mr-1" />
+                      )}
+                      {config.is_enabled ? '禁用' : '启用'}
+                    </Button>
                     
                     <Button
                       variant="outline"
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto"
                       onClick={() => handleDelete(config.id)}
+                      disabled={mutatingId === config.id}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -587,6 +718,7 @@ export default function StorageConfigs() {
             onNameChange={handleNameChange}
             onTypeChange={handleTypeChange}
             onConfigChange={handleConfigChange}
+            onIsEnabledChange={handleIsEnabledChange}
             onIsDefaultChange={handleIsDefaultChange}
           />
           <div className="flex justify-end gap-3">

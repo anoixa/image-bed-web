@@ -22,6 +22,21 @@ const refreshRequest: AxiosInstance = axios.create({
   },
 });
 
+export class ApiRequestError extends Error {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
+function normalizeResponseError(error: AxiosError<ApiResponse>): ApiRequestError {
+  const message = error.response?.data?.msg || error.message || '请求失败';
+  return new ApiRequestError(message, error.response?.status);
+}
+
 const refreshTokenApi = (): Promise<LoginSuccessResponse> => {
   return refreshRequest.post<ApiResponse<LoginSuccessResponse>>('/api/auth/refresh').then((res) => {
     if (res.data.status === 'error') {
@@ -198,7 +213,7 @@ request.interceptors.response.use(
 
     // 不满足刷新条件时直接抛出错误
     if (!originalRequest || error.response?.status !== 401 || originalRequest._retry || isExcluded) {
-      return Promise.reject(error);
+      return Promise.reject(normalizeResponseError(error));
     }
 
     // 标记已重试，防止无限循环
