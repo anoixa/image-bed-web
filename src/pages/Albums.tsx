@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Folder, Plus, Trash2, Edit2, X, Check, Loader2, Image, ExternalLink } from 'lucide-react';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
@@ -32,11 +32,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { fetchAlbums, createAlbum, updateAlbum, deleteAlbum } from '@/api/albums';
+import { isRequestCanceled } from '@/lib/request';
 import type { Album } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { Link } from 'react-router-dom';
 
 export default function Albums() {
+  const requestControllerRef = useRef<AbortController | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -61,23 +63,31 @@ export default function Albums() {
   });
 
   const loadAlbums = useCallback(async () => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
     setLoading(true);
     try {
-      const data = await fetchAlbums();
+      const data = await fetchAlbums(1, 20, { signal: controller.signal });
       setAlbums(data);
     } catch (error) {
+      if (isRequestCanceled(error)) return;
       toast({
         title: '加载失败',
         description: error instanceof Error ? error.message : '请稍后重试',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     loadAlbums();
+    return () => requestControllerRef.current?.abort();
   }, [loadAlbums]);
 
   const handleCreate = async () => {

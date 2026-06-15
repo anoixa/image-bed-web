@@ -30,12 +30,12 @@ export const refreshToken = (): Promise<LoginSuccessResponse> => {
 
 // 登出
 export const logout = (): Promise<void> => {
-  return post('/api/auth/logout');
+  return post('/api/auth/logout', undefined, { expectData: false });
 };
 
 // 修改密码
 export const changePassword = (oldPassword: string, newPassword: string): Promise<void> => {
-  return post('/api/v1/user/password', { old_password: oldPassword, new_password: newPassword });
+  return post('/api/v1/user/password', { old_password: oldPassword, new_password: newPassword }, { expectData: false });
 };
 
 // ==================== 2FA ====================
@@ -57,12 +57,12 @@ export const setup2FA = (data: TwoFASetupRequest): Promise<TwoFASetupResponse> =
 
 // 启用 2FA
 export const enable2FA = (data: TwoFAToggleRequest): Promise<void> => {
-  return post('/api/v1/user/2fa/enable', data);
+  return post('/api/v1/user/2fa/enable', data, { expectData: false });
 };
 
 // 关闭 2FA
 export const disable2FA = (data: TwoFAToggleRequest): Promise<void> => {
-  return post('/api/v1/user/2fa/disable', data);
+  return post('/api/v1/user/2fa/disable', data, { expectData: false });
 };
 
 // ==================== OAuth ====================
@@ -84,7 +84,7 @@ export const getOAuthIdentities = (): Promise<{ identities: OAuthIdentity[] }> =
 
 // 解绑 OAuth 身份
 export const unlinkOAuthIdentity = (provider: string): Promise<void> => {
-  return del(`/api/auth/oauth/identities/${provider}`);
+  return del(`/api/auth/oauth/identities/${provider}`, { expectData: false });
 };
 
 // 启动 OAuth 绑定（JSON 模式）

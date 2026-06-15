@@ -1,6 +1,39 @@
 import { get, post, put, del } from '@/lib/request';
 import type { StorageConfig, CreateStorageConfigRequest, TestConfigRequest, TestConfigResponse, ConfigCategory, TransferModeConfig, TransferModeRequest } from '@/types';
 
+const MASKED_SECRET_PATTERN = /^(?:\*+|•+|●+|x+|<masked>|masked|redacted)$/i;
+const SENSITIVE_CONFIG_KEY_PATTERN = /(?:secret|password|token|private_key|api_key)/i;
+
+export function isMaskedSensitiveValue(value: unknown): boolean {
+  return typeof value === 'string' && MASKED_SECRET_PATTERN.test(value.trim());
+}
+
+export function sanitizeStorageConfigUpdate(
+  data: Partial<CreateStorageConfigRequest>
+): Partial<CreateStorageConfigRequest> {
+  if (!data.config) {
+    return data;
+  }
+
+  const config = Object.fromEntries(
+    Object.entries(data.config).filter(([key, value]) => {
+      if (!SENSITIVE_CONFIG_KEY_PATTERN.test(key)) {
+        return true;
+      }
+      return value !== '' && value !== null && value !== undefined && !isMaskedSensitiveValue(value);
+    })
+  );
+  const sanitized = { ...data };
+
+  if (Object.keys(config).length > 0) {
+    sanitized.config = config;
+  } else {
+    delete sanitized.config;
+  }
+
+  return sanitized;
+}
+
 // 获取存储配置列表 - GET /api/v1/admin/configs
 export const fetchStorageConfigs = (category?: ConfigCategory, enabledOnly?: boolean): Promise<StorageConfig[]> => {
   const params = new URLSearchParams();
@@ -22,27 +55,27 @@ export const createStorageConfig = (data: CreateStorageConfigRequest): Promise<S
 
 // 更新存储配置 - PUT /api/v1/admin/configs/{id}
 export const updateStorageConfig = (id: number, data: Partial<CreateStorageConfigRequest>): Promise<StorageConfig> => {
-  return put<StorageConfig>(`/api/v1/admin/configs/${id}`, data);
+  return put<StorageConfig>(`/api/v1/admin/configs/${id}`, sanitizeStorageConfigUpdate(data));
 };
 
 // 删除存储配置 - DELETE /api/v1/admin/configs/{id}
 export const deleteStorageConfig = (id: number): Promise<void> => {
-  return del(`/api/v1/admin/configs/${id}`);
+  return del(`/api/v1/admin/configs/${id}`, { expectData: false });
 };
 
 // 设置默认配置 - POST /api/v1/admin/configs/{id}/default
 export const setDefaultStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/default`);
+  return post(`/api/v1/admin/configs/${id}/default`, undefined, { expectData: false });
 };
 
 // 启用配置 - POST /api/v1/admin/configs/{id}/enable
 export const enableStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/enable`);
+  return post(`/api/v1/admin/configs/${id}/enable`, undefined, { expectData: false });
 };
 
 // 禁用配置 - POST /api/v1/admin/configs/{id}/disable
 export const disableStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/disable`);
+  return post(`/api/v1/admin/configs/${id}/disable`, undefined, { expectData: false });
 };
 
 // 测试配置连接 - POST /api/v1/admin/configs/{id}/test
@@ -62,7 +95,7 @@ export const fetchStorageProviders = (): Promise<{ category: string; name: strin
 
 // 重新加载存储配置 - POST /api/v1/admin/storage/reload/{id}
 export const reloadStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/storage/reload/${id}`);
+  return post(`/api/v1/admin/storage/reload/${id}`, undefined, { expectData: false });
 };
 
 // 获取全局 Transfer Mode 配置 - GET /api/v1/admin/transfer-mode

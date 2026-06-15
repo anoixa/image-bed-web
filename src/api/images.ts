@@ -1,4 +1,5 @@
 import { get, post, del, put, upload, uploadWithProgress } from '@/lib/request';
+import type { ApiRequestConfig } from '@/lib/request';
 import type {
   Image,
   PaginatedResponse,
@@ -35,7 +36,10 @@ interface ImageListResponse {
 }
 
 // 获取图片列表 - POST /api/v1/images
-export const fetchImages = (params: ImageListParams = {}): Promise<PaginatedResponse<Image>> => {
+export const fetchImages = (
+  params: ImageListParams = {},
+  config?: ApiRequestConfig
+): Promise<PaginatedResponse<Image>> => {
   return post<ImageListResponse>('/api/v1/images', {
     page: params.page || 1,
     limit: params.limit || 20,
@@ -46,7 +50,7 @@ export const fetchImages = (params: ImageListParams = {}): Promise<PaginatedResp
     start_time: params.start_time,
     end_time: params.end_time,
     sort: params.sort || 'desc',
-  }).then((response) => {
+  }, config).then((response) => {
     const mappedItems = response.images.map((item: Image) => ({
       ...item,
       // 后端返回 id，前端使用 identifier
@@ -137,7 +141,7 @@ export const uploadImagesWithProgress = (
 
 // 删除单张图片 - DELETE /api/v1/images/{identifier}
 export const deleteImage = (identifier: string): Promise<void> => {
-  return del(`/api/v1/images/${identifier}`);
+  return del(`/api/v1/images/${identifier}`, { expectData: false });
 };
 
 // 批量删除图片 - POST /api/v1/images/delete
@@ -150,7 +154,7 @@ export const updateImageVisibility = (
   identifier: string,
   isPublic: boolean
 ): Promise<void> => {
-  return put(`/api/v1/images/${identifier}/visibility`, { is_public: isPublic });
+  return put(`/api/v1/images/${identifier}/visibility`, { is_public: isPublic }, { expectData: false });
 };
 
 // 初始化分片上传
@@ -264,5 +268,5 @@ export const fetchRandomSourceAlbum = (): Promise<RandomSourceAlbumConfig> => {
 
 // 设置随机图源相册（admin）- POST /api/v1/admin/random-source-album
 export const updateRandomSourceAlbum = (config: RandomSourceAlbumConfig): Promise<void> => {
-  return post('/api/v1/admin/random-source-album', config);
+  return post('/api/v1/admin/random-source-album', config, { expectData: false });
 };

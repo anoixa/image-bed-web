@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { uploadImageWithProgress, uploadImagesWithProgress } from '@/api/images';
 import { toast } from '@/components/ui/use-toast';
 import type { UploadImageResponse, Image } from '@/types';
+import { reconcileBatchUploadResults } from '@/lib/uploadResults';
 
 // 批量链接展示组件
 interface BatchLinksContentProps {
@@ -335,6 +336,10 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
     );
   };
 
+  const updateFilesStatus = (ids: Set<string>, updates: Partial<UploadFile>) => {
+    setFiles((prev) => prev.map((file) => (ids.has(file.id) ? { ...file, ...updates } : file)));
+  };
+
 
   const generateLinkFormats = (image: UploadImageResponse): LinkFormat[] => {
     const formats: LinkFormat[] = [
@@ -400,7 +405,8 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
       }
     } else {
       // 批量上传：使用批量 API 带总进度
-      pendingFiles.forEach((f) => updateFileStatus(f.id, { status: 'uploading', progress: 0 }));
+      const pendingIds = new Set(pendingFiles.map((file) => file.id));
+      updateFilesStatus(pendingIds, { status: 'uploading', progress: 0, errorMessage: undefined });
 
       try {
         const strategyId = storageId ? parseInt(storageId, 10) : undefined;
@@ -412,31 +418,21 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
           (progress) => {
             setTotalProgress(progress);
             // 所有文件的进度与总进度保持一致
-            pendingFiles.forEach((f) => {
-              updateFileStatus(f.id, { progress });
-            });
+            updateFilesStatus(pendingIds, { progress });
           }
         );
 
-        // 批量上传成功后更新所有文件状态
-        if (result.success && result.success.length > 0) {
-          // 将 success 数组映射为 UploadImageResponse 格式
-          const uploadedImages: UploadImageResponse[] = result.success.map((item) => ({
-            identifier: item.identifier,
-            filename: item.filename,
-            file_size: item.file_size,
-            links: item.links,
-          }));
+        const { updates, uploadedImages } = reconcileBatchUploadResults(
+          pendingFiles.map((file) => ({ id: file.id, filename: file.file.name })),
+          result
+        );
+        setFiles((prev) => prev.map((file) => ({ ...file, ...updates.get(file.id) })));
+        const successCount = Array.from(updates.values()).filter(
+          (update) => update.status === 'success'
+        ).length;
+        const errorCount = updates.size - successCount;
 
-          result.success.forEach((item, index) => {
-            if (pendingFiles[index]) {
-              updateFileStatus(pendingFiles[index].id, {
-                status: 'success',
-                progress: 100,
-                result: uploadedImages[index],
-              });
-            }
-          });
+        if (uploadedImages.length > 0) {
           setAllUploadedImages(uploadedImages);
           const lastImage = uploadedImages[uploadedImages.length - 1];
           const links = generateLinkFormats(lastImage);
@@ -453,11 +449,13 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
             } as Image);
           });
 
-          toast({
-            title: '上传成功',
-            description: `成功上传 ${result.success.length} 张图片`,
-          });
         }
+
+        toast({
+          title: errorCount > 0 ? '部分文件上传失败' : '上传成功',
+          description: `成功 ${successCount} 张，失败 ${errorCount} 张`,
+          variant: errorCount > 0 ? 'destructive' : 'default',
+        });
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : '上传失败';
         pendingFiles.forEach((f) => {

@@ -11,5 +11,5 @@ export const fetchDashboardStats = (): Promise<DashboardStats> => {
 // 刷新统计数据缓存
 // POST /api/v1/dashboard/stats/refresh
 export const refreshDashboardStats = (): Promise<void> => {
-  return post('/api/v1/dashboard/stats/refresh');
+  return post('/api/v1/dashboard/stats/refresh', undefined, { expectData: false });
 };

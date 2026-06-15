@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield,
   Plus,
@@ -41,6 +41,7 @@ import {
   unlinkUserOAuthIdentity,
 } from '@/api/admin';
 import type { UserListItem, UserRole, UserStatus, OAuthIdentity } from '@/types';
+import { isRequestCanceled } from '@/lib/request';
 
 const PAGE_SIZE = 20;
 
@@ -58,6 +59,7 @@ export default function Users() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const requestControllerRef = useRef<AbortController | null>(null);
   const currentUser = useAuthStore((state) => state.user);
 
   // 弹窗状态
@@ -77,24 +79,32 @@ export default function Users() {
   const [reset2FAConfirmOpen, setReset2FAConfirmOpen] = useState(false);
 
   const loadUsers = useCallback(async () => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
     setLoading(true);
     try {
-      const data = await listUsers(page, PAGE_SIZE);
+      const data = await listUsers(page, PAGE_SIZE, { signal: controller.signal });
       setUsers(data.users);
       setTotal(data.total);
     } catch (error) {
+      if (isRequestCanceled(error)) return;
       toast({
         title: '加载失败',
         description: error instanceof Error ? error.message : '获取用户列表失败',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      if (requestControllerRef.current === controller) {
+        requestControllerRef.current = null;
+        setLoading(false);
+      }
     }
   }, [page]);
 
   useEffect(() => {
     loadUsers();
+    return () => requestControllerRef.current?.abort();
   }, [loadUsers]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

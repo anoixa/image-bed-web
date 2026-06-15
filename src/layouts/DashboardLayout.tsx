@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   ImageIcon,
@@ -63,9 +63,9 @@ const allNavItems: NavItem[] = [
   { path: '/albums', label: '相册管理', icon: Folder },
   { path: '/tokens', label: 'API Token', icon: Key },
   { path: '/users', label: '用户管理', icon: Shield, adminOnly: true },
-  { path: '/storage', label: '存储配置', icon: Database },
+  { path: '/storage', label: '存储配置', icon: Database, adminOnly: true },
   { path: '/api-docs', label: 'API 文档', icon: BookOpen },
-  { path: '/settings', label: '系统设置', icon: Settings },
+  { path: '/settings', label: '系统设置', icon: Settings, adminOnly: true },
   { path: '/account', label: '账号设置', icon: UserCog },
 ];
 
@@ -309,20 +309,34 @@ export default function DashboardLayout() {
     setInputValue(searchQuery);
   }, [searchQuery]);
 
+  const updateSearchParam = useCallback((rawValue: string) => {
+    const value = rawValue.trim();
+    setSearchParams((currentParams) => {
+      const nextParams = new URLSearchParams(currentParams);
+      if (value) {
+        nextParams.set('search', value);
+      } else {
+        nextParams.delete('search');
+      }
+      return nextParams;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  useEffect(() => {
+    const value = inputValue.trim();
+    if (value === searchQuery) return;
+
+    const timeoutId = window.setTimeout(() => updateSearchParam(value), 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [inputValue, searchQuery, updateSearchParam]);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      // 按 Enter 时才更新 URL
-      const value = inputValue.trim();
-      if (value) {
-        setSearchParams({ search: value });
-      } else {
-        searchParams.delete('search');
-        setSearchParams(searchParams);
-      }
+      updateSearchParam(inputValue);
     }
   };
 
@@ -330,19 +344,13 @@ export default function DashboardLayout() {
     // 失焦时也更新 URL（可选）
     const value = inputValue.trim();
     if (value !== searchQuery) {
-      if (value) {
-        setSearchParams({ search: value });
-      } else {
-        searchParams.delete('search');
-        setSearchParams(searchParams);
-      }
+      updateSearchParam(value);
     }
   };
 
   const handleClearSearch = () => {
     setInputValue('');
-    searchParams.delete('search');
-    setSearchParams(searchParams);
+    updateSearchParam('');
   };
 
   // 上传成功时标记，关闭弹窗后刷新

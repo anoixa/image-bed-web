@@ -26,11 +26,14 @@ npm run build
 
 ## 配置
 
-在 `.env` 文件中配置 API 地址：
+复制 `.env.example` 为 `.env`，并按开发环境配置 API 地址和代理目标：
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_BASE_URL=
+DEV_PROXY_TARGET=http://localhost:8080
 ```
+
+开发环境建议保留 `VITE_API_BASE_URL` 为空，通过 `DEV_PROXY_TARGET` 使用 Vite 代理。
 
 ## 许可证
 

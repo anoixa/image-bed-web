@@ -23,15 +23,15 @@ export const fetchTokens = (): Promise<Token[]> => {
 
 // 启用 Token - POST /api/v1/token/{id}/enable
 export const enableToken = (id: string | number): Promise<void> => {
-  return post(`/api/v1/token/${id}/enable`);
+  return post(`/api/v1/token/${id}/enable`, undefined, { expectData: false });
 };
 
 // 禁用 Token - POST /api/v1/token/{id}/disable
 export const disableToken = (id: string | number): Promise<void> => {
-  return post(`/api/v1/token/${id}/disable`);
+  return post(`/api/v1/token/${id}/disable`, undefined, { expectData: false });
 };
 
 // 撤销 Token - DELETE /api/v1/token/{id}
 export const deleteToken = (id: string | number): Promise<void> => {
-  return del(`/api/v1/token/${id}`);
+  return del(`/api/v1/token/${id}`, { expectData: false });
 };
