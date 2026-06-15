@@ -17,6 +17,7 @@ import { fetchImages, deleteImage, deleteImages } from '@/api/images';
 import { fetchAlbums, removeImagesFromAlbum } from '@/api/albums';
 import type { Image, PaginatedResponse, Album } from '@/types';
 import { toast } from '@/components/ui/use-toast';
+import { isRequestCanceled } from '@/lib/request';
 import { Link, useSearchParams } from 'react-router-dom';
 import ConfirmDialog from './ConfirmDialog';
 import AlbumSelectModal from './AlbumSelectModal';
@@ -54,6 +55,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   
   const inFlightRequestRef = useRef<string | null>(null);
   const latestRequestIdRef = useRef(0);
+  const requestControllerRef = useRef<AbortController | null>(null);
 
   // 批量操作状态
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -107,6 +109,9 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     }
 
     inFlightRequestRef.current = requestKey;
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
     latestRequestIdRef.current += 1;
     const requestId = latestRequestIdRef.current;
 
@@ -130,7 +135,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         params.search = searchQuery.trim();
       }
 
-      const response = await fetchImages(params);
+      const response = await fetchImages(params, { signal: controller.signal });
 
       if (requestId !== latestRequestIdRef.current) {
         return;
@@ -157,6 +162,9 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       const totalPages = Math.ceil(total / perPage);
       setHasMore(page < totalPages && items.length > 0);
     } catch (err) {
+      if (isRequestCanceled(err)) {
+        return;
+      }
       const errorMsg = err instanceof Error ? err.message : '加载失败';
       setError(errorMsg);
       if (page === 1) {
@@ -171,11 +179,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         inFlightRequestRef.current = null;
       }
       if (requestId === latestRequestIdRef.current) {
+        requestControllerRef.current = null;
         setLoading(false);
         setHasLoaded(true);
       }
     }
   }, [albumFilter, searchQuery, sortBy, sortOrder]);
+
+  useEffect(() => () => requestControllerRef.current?.abort(), []);
 
   // 监听外部刷新事件（如上传成功后）
   useEffect(() => {

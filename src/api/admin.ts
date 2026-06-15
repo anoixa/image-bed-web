@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/lib/request';
+import type { ApiRequestConfig } from '@/lib/request';
 import type {
   PaginatedUsersResponse,
   CreateUserRequest,
@@ -12,10 +13,12 @@ import type {
 // 获取用户列表（分页）
 export const listUsers = (
   page: number = 1,
-  pageSize: number = 20
+  pageSize: number = 20,
+  config?: ApiRequestConfig
 ): Promise<PaginatedUsersResponse> => {
   return get<PaginatedUsersResponse>(
-    `/api/v1/admin/users?page=${page}&page_size=${pageSize}`
+    `/api/v1/admin/users?page=${page}&page_size=${pageSize}`,
+    config
   );
 };
 
@@ -26,12 +29,12 @@ export const createUser = (data: CreateUserRequest): Promise<CreateUserResponse>
 
 // 更新用户角色
 export const updateUserRole = (id: number, data: UpdateRoleRequest): Promise<void> => {
-  return put<void>(`/api/v1/admin/users/${id}/role`, data);
+  return put<void>(`/api/v1/admin/users/${id}/role`, data, { expectData: false });
 };
 
 // 更新用户状态
 export const updateUserStatus = (id: number, data: UpdateStatusRequest): Promise<void> => {
-  return put<void>(`/api/v1/admin/users/${id}/status`, data);
+  return put<void>(`/api/v1/admin/users/${id}/status`, data, { expectData: false });
 };
 
 // 重置用户密码
@@ -41,7 +44,7 @@ export const resetUserPassword = (id: number): Promise<ResetPasswordResponse> =>
 
 // 删除用户
 export const deleteUser = (id: number): Promise<void> => {
-  return del<void>(`/api/v1/admin/users/${id}`);
+  return del<void>(`/api/v1/admin/users/${id}`, { expectData: false });
 };
 
 // ==================== OAuth 管理 ====================

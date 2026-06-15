@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import JustifiedImageCard from './JustifiedImageCard';
 import ConfirmDialog from './ConfirmDialog';
+import { buildGalleryRows, GALLERY_GAP } from './justifiedGalleryLayout';
 
 interface JustifiedGalleryProps {
   images: Image[];
@@ -45,49 +46,10 @@ interface JustifiedGalleryProps {
   loaderRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-// 行高常量
-const ROW_HEIGHT = 200;
-const GAP = 10;
+const GAP = GALLERY_GAP;
 
 const getImageOriginalUrl = (image: Image) => image.links?.original || image.url || '';
 const getImagePreviewKey = (image: Image) => image.identifier || String(image.id);
-
-// 将图片分组到行中
-function groupImagesIntoRows(images: Image[], containerWidth: number): Image[][] {
-  // 如果还没有获取到容器宽度，使用一个默认的最小宽度来避免闪烁
-  const effectiveWidth = containerWidth > 0 ? containerWidth : 800;
-  if (images.length === 0) return [];
-
-  const rows: Image[][] = [];
-  let currentRow: Image[] = [];
-  let currentRowWidth = 0;
-
-  for (const image of images) {
-    const aspectRatio = (image.width || 1) / (image.height || 1);
-    const imageWidth = ROW_HEIGHT * aspectRatio;
-
-    // 如果当前行加上这张图片会超出容器宽度（且当前行已有图片）
-    const wouldExceed = currentRowWidth + imageWidth + (currentRow.length > 0 ? GAP : 0) > effectiveWidth;
-    
-    if (wouldExceed && currentRow.length > 0) {
-      // 保存当前行，开始新行
-      rows.push(currentRow);
-      currentRow = [image];
-      currentRowWidth = imageWidth;
-    } else {
-      // 添加到当前行
-      currentRow.push(image);
-      currentRowWidth += imageWidth + (currentRow.length > 1 ? GAP : 0);
-    }
-  }
-
-  // 添加最后一行
-  if (currentRow.length > 0) {
-    rows.push(currentRow);
-  }
-
-  return rows;
-}
 
 export default function JustifiedGallery({
   images,
@@ -159,7 +121,7 @@ export default function JustifiedGallery({
 
   // 将图片分组到行
   const rows = useMemo(() => {
-    return groupImagesIntoRows(images, containerWidth);
+    return buildGalleryRows(images, containerWidth);
   }, [images, containerWidth]);
 
   const previewImages = useMemo(() => {
@@ -184,62 +146,6 @@ export default function JustifiedGallery({
     }
     setPreviewIndex(index);
     setPreviewVisible(true);
-  };
-
-  // 计算每行的缩放比例（让行填满容器宽度）
-  const getRowStyle = (row: Image[]): React.CSSProperties => {
-    if (row.length === 0) return {};
-
-    // 计算行内图片原始总宽度
-    const totalOriginalWidth = row.reduce((sum, img) => {
-      const aspectRatio = (img.width || 1) / (img.height || 1);
-      return sum + ROW_HEIGHT * aspectRatio;
-    }, 0);
-
-    // 计算总 gap
-    const totalGap = (row.length - 1) * GAP;
-
-    // 计算需要的缩放比例
-    const scale = (containerWidth - totalGap) / totalOriginalWidth;
-
-    // 如果只有一张图片且缩放后太宽，限制最大宽度
-    if (row.length === 1 && scale > 3) {
-      return { height: ROW_HEIGHT, justifyContent: 'flex-start' };
-    }
-
-    return { height: ROW_HEIGHT };
-  };
-
-  // 计算单个图片的样式
-  const getImageStyle = (image: Image, row: Image[]): React.CSSProperties => {
-    const aspectRatio = (image.width || 1) / (image.height || 1);
-    const originalWidth = ROW_HEIGHT * aspectRatio;
-
-    // 计算行缩放比例
-    const totalOriginalWidth = row.reduce((sum, img) => {
-      const ar = (img.width || 1) / (img.height || 1);
-      return sum + ROW_HEIGHT * ar;
-    }, 0);
-    const totalGap = (row.length - 1) * GAP;
-    const scale = (containerWidth - totalGap) / totalOriginalWidth;
-
-    // 最后一行且填不满时，保持原始比例
-    const isLastRow = row === rows[rows.length - 1];
-    const rowTotalWidth = totalOriginalWidth * scale + totalGap;
-    
-    if (isLastRow && rowTotalWidth < containerWidth * 0.8) {
-      return {
-        height: ROW_HEIGHT,
-        width: originalWidth,
-        flexShrink: 0,
-      };
-    }
-
-    return {
-      height: ROW_HEIGHT,
-      flexGrow: originalWidth * scale,
-      flexBasis: 0,
-    };
   };
 
   const hasActiveFilters = visibilityFilter !== 'all' || albumFilter !== 'all';
@@ -488,15 +394,15 @@ export default function JustifiedGallery({
             key={rowIndex}
             className="flex w-full"
             style={{
-              ...getRowStyle(row),
+              ...row.rowStyle,
               gap: GAP,
             }}
           >
-            {row.map((image) => (
+            {row.images.map((image, imageIndex) => (
               <JustifiedImageCard
                 key={getImagePreviewKey(image)}
                 image={image}
-                style={getImageStyle(image, row)}
+                style={row.imageStyles[imageIndex]}
                 onDelete={onDelete}
                 onAddToAlbum={onAddToAlbum}
                 onPreview={handlePreview}

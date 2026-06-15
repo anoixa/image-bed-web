@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/lib/request';
+import type { ApiRequestConfig } from '@/lib/request';
 import type { Album, AlbumDetail } from '@/types';
 
 // 相册列表响应结构
@@ -25,8 +26,12 @@ interface RemoveImagesFromAlbumResponse {
 }
 
 // 获取相册列表 - GET /api/v1/albums
-export const fetchAlbums = (page: number = 1, limit: number = 20): Promise<Album[]> => {
-  return get<AlbumsResponse>(`/api/v1/albums?page=${page}&limit=${limit}`).then(
+export const fetchAlbums = (
+  page: number = 1,
+  limit: number = 20,
+  config?: ApiRequestConfig
+): Promise<Album[]> => {
+  return get<AlbumsResponse>(`/api/v1/albums?page=${page}&limit=${limit}`, config).then(
     (res) => res?.albums || []
   );
 };
@@ -52,7 +57,7 @@ export const updateAlbum = (
 
 // 删除相册 - DELETE /api/v1/albums/{id}
 export const deleteAlbum = (id: string | number): Promise<void> => {
-  return del(`/api/v1/albums/${id}`);
+  return del(`/api/v1/albums/${id}`, { expectData: false });
 };
 
 // 添加图片到相册 - POST /api/v1/albums/{id}/images
@@ -69,7 +74,7 @@ export const removeImageFromAlbum = (
   albumId: string | number,
   imageId: string | number
 ): Promise<void> => {
-  return del(`/api/v1/albums/${albumId}/images/${imageId}`);
+  return del(`/api/v1/albums/${albumId}/images/${imageId}`, { expectData: false });
 };
 
 // 批量从相册移除图片 - POST /api/v1/albums/{id}/images/remove

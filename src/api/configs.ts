@@ -60,22 +60,22 @@ export const updateStorageConfig = (id: number, data: Partial<CreateStorageConfi
 
 // 删除存储配置 - DELETE /api/v1/admin/configs/{id}
 export const deleteStorageConfig = (id: number): Promise<void> => {
-  return del(`/api/v1/admin/configs/${id}`);
+  return del(`/api/v1/admin/configs/${id}`, { expectData: false });
 };
 
 // 设置默认配置 - POST /api/v1/admin/configs/{id}/default
 export const setDefaultStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/default`);
+  return post(`/api/v1/admin/configs/${id}/default`, undefined, { expectData: false });
 };
 
 // 启用配置 - POST /api/v1/admin/configs/{id}/enable
 export const enableStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/enable`);
+  return post(`/api/v1/admin/configs/${id}/enable`, undefined, { expectData: false });
 };
 
 // 禁用配置 - POST /api/v1/admin/configs/{id}/disable
 export const disableStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/disable`);
+  return post(`/api/v1/admin/configs/${id}/disable`, undefined, { expectData: false });
 };
 
 // 测试配置连接 - POST /api/v1/admin/configs/{id}/test
@@ -95,7 +95,7 @@ export const fetchStorageProviders = (): Promise<{ category: string; name: strin
 
 // 重新加载存储配置 - POST /api/v1/admin/storage/reload/{id}
 export const reloadStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/storage/reload/${id}`);
+  return post(`/api/v1/admin/storage/reload/${id}`, undefined, { expectData: false });
 };
 
 // 获取全局 Transfer Mode 配置 - GET /api/v1/admin/transfer-mode

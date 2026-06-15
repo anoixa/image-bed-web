@@ -3,6 +3,10 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, Inte
 import type { ApiResponse, LoginSuccessResponse } from '@/types';
 import { clearAuthToken, getAuthToken, getAuthTokenExpiry, setAuthToken } from '@/lib/authToken';
 
+export interface ApiRequestConfig extends AxiosRequestConfig {
+  expectData?: boolean;
+}
+
 const request: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 30000,
@@ -37,12 +41,43 @@ function normalizeResponseError(error: AxiosError<ApiResponse>): ApiRequestError
   return new ApiRequestError(message, error.response?.status);
 }
 
+export function isRequestCanceled(error: unknown): boolean {
+  return axios.isCancel(error);
+}
+
+function toAxiosConfig(config?: ApiRequestConfig): AxiosRequestConfig | undefined {
+  if (!config) return undefined;
+  const axiosConfig = { ...config };
+  delete axiosConfig.expectData;
+  return axiosConfig;
+}
+
+export function unwrapApiResponse<T>(
+  payload: unknown,
+  endpoint: string,
+  expectData: boolean = true
+): T {
+  if (!payload || typeof payload !== 'object') {
+    throw new ApiRequestError(`接口 ${endpoint} 返回了无效响应`);
+  }
+
+  const response = payload as Partial<ApiResponse<T>>;
+  if (response.status !== 'success' && response.status !== 'error') {
+    throw new ApiRequestError(`接口 ${endpoint} 返回了未知状态`);
+  }
+  if (response.status === 'error') {
+    throw new ApiRequestError(response.msg || '请求失败');
+  }
+  if (expectData && !Object.prototype.hasOwnProperty.call(response, 'data')) {
+    throw new ApiRequestError(`接口 ${endpoint} 成功响应缺少 data`);
+  }
+
+  return response.data as T;
+}
+
 const refreshTokenApi = (): Promise<LoginSuccessResponse> => {
   return refreshRequest.post<ApiResponse<LoginSuccessResponse>>('/api/auth/refresh').then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '刷新失败');
-    }
-    return res.data.data as LoginSuccessResponse;
+    return unwrapApiResponse<LoginSuccessResponse>(res.data, '/api/auth/refresh');
   });
 };
 
@@ -189,6 +224,10 @@ request.interceptors.response.use(
     return response;
   },
   async (error: AxiosError<ApiResponse>) => {
+    if (isRequestCanceled(error)) {
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const isExcluded = EXCLUDE_FROM_REFRESH.some(url => originalRequest?.url?.includes(url));
 
@@ -226,58 +265,40 @@ request.interceptors.response.use(
 // 导出 HTTP 方法
 // ============================================
 
-export const get = <T>(url: string, config?: AxiosRequestConfig): Promise<T> => {
-  return request.get<ApiResponse<T>>(url, config).then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '请求失败');
-    }
-    return res.data.data as T;
-  });
+export const get = <T>(url: string, config?: ApiRequestConfig): Promise<T> => {
+  return request
+    .get<ApiResponse<T>>(url, toAxiosConfig(config))
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
-export const post = <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> => {
-  return request.post<ApiResponse<T>>(url, data, config).then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '请求失败');
-    }
-    return res.data.data as T;
-  });
+export const post = <T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<T> => {
+  return request
+    .post<ApiResponse<T>>(url, data, toAxiosConfig(config))
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
-export const put = <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> => {
-  return request.put<ApiResponse<T>>(url, data, config).then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '请求失败');
-    }
-    return res.data.data as T;
-  });
+export const put = <T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<T> => {
+  return request
+    .put<ApiResponse<T>>(url, data, toAxiosConfig(config))
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
-export const patch = <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> => {
-  return request.patch<ApiResponse<T>>(url, data, config).then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '请求失败');
-    }
-    return res.data.data as T;
-  });
+export const patch = <T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<T> => {
+  return request
+    .patch<ApiResponse<T>>(url, data, toAxiosConfig(config))
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
-export const del = <T>(url: string, config?: AxiosRequestConfig): Promise<T> => {
-  return request.delete<ApiResponse<T>>(url, config).then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '请求失败');
-    }
-    return res.data.data as T;
-  });
+export const del = <T>(url: string, config?: ApiRequestConfig): Promise<T> => {
+  return request
+    .delete<ApiResponse<T>>(url, toAxiosConfig(config))
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
-export const upload = <T>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<T> => {
-  return request.post<ApiResponse<T>>(url, formData, config).then((res) => {
-    if (res.data.status === 'error') {
-      throw new Error(res.data.msg || '上传失败');
-    }
-    return res.data.data as T;
-  });
+export const upload = <T>(url: string, formData: FormData, config?: ApiRequestConfig): Promise<T> => {
+  return request
+    .post<ApiResponse<T>>(url, formData, toAxiosConfig(config))
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
 // 带进度回调的上传函数
@@ -285,11 +306,11 @@ export const uploadWithProgress = <T>(
   url: string,
   formData: FormData,
   onProgress?: (progress: number) => void,
-  config?: AxiosRequestConfig
+  config?: ApiRequestConfig
 ): Promise<T> => {
   return request
     .post<ApiResponse<T>>(url, formData, {
-      ...config,
+      ...toAxiosConfig(config),
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total && progressEvent.total > 0) {
           const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -297,12 +318,7 @@ export const uploadWithProgress = <T>(
         }
       },
     })
-    .then((res) => {
-      if (res.data.status === 'error') {
-        throw new Error(res.data.msg || '上传失败');
-      }
-      return res.data.data as T;
-    });
+    .then((res) => unwrapApiResponse<T>(res.data, url, config?.expectData));
 };
 
 export default request;
