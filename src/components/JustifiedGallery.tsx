@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Loader2, ImageIcon, FolderOpen, Filter, X, CheckSquare, Square, FolderMinus, FolderPlus, Trash2, ArrowUpDown, Eye, EyeOff } from 'lucide-react';
-import { PhotoProvider } from 'react-photo-view';
+import { PhotoSlider } from 'react-photo-view';
 import type { Image, Album } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +48,9 @@ interface JustifiedGalleryProps {
 // 行高常量
 const ROW_HEIGHT = 200;
 const GAP = 10;
+
+const getImageOriginalUrl = (image: Image) => image.links?.original || image.url || '';
+const getImagePreviewKey = (image: Image) => image.identifier || String(image.id);
 
 // 将图片分组到行中
 function groupImagesIntoRows(images: Image[], containerWidth: number): Image[][] {
@@ -118,6 +121,8 @@ export default function JustifiedGallery({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   // 使用 ResizeObserver 获取容器宽度
@@ -156,6 +161,30 @@ export default function JustifiedGallery({
   const rows = useMemo(() => {
     return groupImagesIntoRows(images, containerWidth);
   }, [images, containerWidth]);
+
+  const previewImages = useMemo(() => {
+    return images.map((image) => ({
+      key: getImagePreviewKey(image),
+      src: getImageOriginalUrl(image),
+      width: image.width,
+      height: image.height,
+    }));
+  }, [images]);
+
+  useEffect(() => {
+    if (previewIndex >= previewImages.length) {
+      setPreviewIndex(Math.max(previewImages.length - 1, 0));
+    }
+  }, [previewImages.length, previewIndex]);
+
+  const handlePreview = (identifier: string) => {
+    const index = previewImages.findIndex((image) => image.key === identifier);
+    if (index === -1 || !previewImages[index]?.src) {
+      return;
+    }
+    setPreviewIndex(index);
+    setPreviewVisible(true);
+  };
 
   // 计算每行的缩放比例（让行填满容器宽度）
   const getRowStyle = (row: Image[]): React.CSSProperties => {
@@ -453,33 +482,42 @@ export default function JustifiedGallery({
       />
 
       {/* 等高瀑布流图片网格 */}
-      <PhotoProvider maskOpacity={0.85} loop={true}>
-        <div className="flex flex-col" style={{ gap: GAP }}>
-          {rows.map((row, rowIndex) => (
-            <div
-              key={rowIndex}
-              className="flex w-full"
-              style={{
-                ...getRowStyle(row),
-                gap: GAP,
-              }}
-            >
-              {row.map((image) => (
-                <JustifiedImageCard
-                  key={image.id}
-                  image={image}
-                  style={getImageStyle(image, row)}
-                  onDelete={onDelete}
-                  onAddToAlbum={onAddToAlbum}
-                  selectable={isBatchMode}
-                  selected={selectedImages.has(image.identifier)}
-                  onSelect={onSelectImage}
-                />
-              ))}
-            </div>
-          ))}
-        </div>
-      </PhotoProvider>
+      <div className="flex flex-col" style={{ gap: GAP }}>
+        {rows.map((row, rowIndex) => (
+          <div
+            key={rowIndex}
+            className="flex w-full"
+            style={{
+              ...getRowStyle(row),
+              gap: GAP,
+            }}
+          >
+            {row.map((image) => (
+              <JustifiedImageCard
+                key={getImagePreviewKey(image)}
+                image={image}
+                style={getImageStyle(image, row)}
+                onDelete={onDelete}
+                onAddToAlbum={onAddToAlbum}
+                onPreview={handlePreview}
+                selectable={isBatchMode}
+                selected={selectedImages.has(image.identifier)}
+                onSelect={onSelectImage}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <PhotoSlider
+        images={previewImages}
+        index={previewIndex}
+        visible={previewVisible}
+        onIndexChange={setPreviewIndex}
+        onClose={() => setPreviewVisible(false)}
+        maskOpacity={0.85}
+        loop={true}
+      />
 
       {/* 加载更多 */}
       <div ref={loaderRef} className="flex justify-center py-8">

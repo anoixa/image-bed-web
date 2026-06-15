@@ -1,5 +1,4 @@
 import { useState, memo } from 'react';
-import { PhotoView } from 'react-photo-view';
 import { Link2, Trash2, FolderPlus } from 'lucide-react';
 import type { Image } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ interface JustifiedImageCardProps {
   style: React.CSSProperties;
   onDelete?: (identifier: string) => void;
   onAddToAlbum?: (identifier: string) => void;
+  onPreview?: (identifier: string) => void;
   selectable?: boolean;
   selected?: boolean;
   onSelect?: (identifier: string, selected: boolean) => void;
@@ -21,15 +21,18 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
   style,
   onDelete,
   onAddToAlbum,
+  onPreview,
   selectable = false,
   selected = false,
   onSelect,
 }: JustifiedImageCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [loadedThumbnailUrl, setLoadedThumbnailUrl] = useState<string | null>(null);
 
   const thumbnailUrl = image.links?.thumbnail || image.thumbnail_url || image.url || '';
   const originalUrl = image.links?.original || image.url || '';
+  const previewKey = image.identifier || String(image.id);
+  const imageLoaded = loadedThumbnailUrl === thumbnailUrl;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -77,6 +80,12 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
     onAddToAlbum?.(image.identifier);
   };
 
+  const handlePreview = () => {
+    if (!selectable && originalUrl) {
+      onPreview?.(previewKey);
+    }
+  };
+
   const formatDate = (dateValue: string | number) => {
     const timestamp = typeof dateValue === 'number' ? dateValue * 1000 : dateValue;
     const date = new Date(timestamp);
@@ -112,20 +121,19 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
 
       {/* 图片 - 使用 key 防止重新加载 */}
       <div className="w-full h-full relative">
-        <PhotoView src={originalUrl}>
-          <img
-            key={`img-${image.identifier}`}
-            src={thumbnailUrl}
-            alt={image.filename}
-            className={`w-full h-full object-cover transition-all duration-300 ${
-              selectable ? 'cursor-pointer' : 'cursor-zoom-in'
-            } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            onLoad={() => setImageLoaded(true)}
-            loading="lazy"
-            decoding="async"
-            style={{ pointerEvents: selectable ? 'none' : 'auto' }}
-          />
-        </PhotoView>
+        <img
+          key={`img-${image.identifier}`}
+          src={thumbnailUrl}
+          alt={image.filename}
+          className={`w-full h-full object-cover transition-all duration-300 ${
+            selectable ? 'cursor-pointer' : 'cursor-zoom-in'
+          } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+          onClick={handlePreview}
+          onLoad={() => setLoadedThumbnailUrl(thumbnailUrl)}
+          loading="lazy"
+          decoding="async"
+          style={{ pointerEvents: selectable ? 'none' : 'auto' }}
+        />
         
         {/* 批量模式下覆盖层处理选择 */}
         {selectable && (
