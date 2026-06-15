@@ -4,12 +4,12 @@ import type { User } from '@/types';
 import {
   login as loginApi,
   logout as logoutApi,
-  refreshToken as refreshTokenApi,
   getCurrentUser,
   verify2FA as verify2FAAPI,
 } from '@/api/auth';
 import type { LoginSuccessResponse } from '@/types';
 import { clearAuthToken, setAuthToken } from '@/lib/authToken';
+import { refreshAccessTokenSingleFlight } from '@/lib/request';
 
 interface AuthState {
   user: User | null;
@@ -131,20 +131,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshAccessToken: async (): Promise<boolean> => {
-        const { isRefreshing } = get();
-
-        if (isRefreshing) {
-          return false;
-        }
-
         set({ isRefreshing: true });
 
         try {
-          const response = await refreshTokenApi();
-
-          const token = response.access_token.replace('Bearer ', '');
-          const expiry = response.access_token_expiry * 1000;
-          setAuthToken(token, expiry);
+          const { token, expiry } = await refreshAccessTokenSingleFlight();
 
           // 刷新后重新获取用户信息
           const user = await getCurrentUser();

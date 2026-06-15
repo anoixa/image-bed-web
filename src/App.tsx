@@ -39,7 +39,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 // 仅管理员可访问的路由
-function AdminRoute({ children }: { children: React.ReactNode }) {
+export function AdminRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const user = useAuthStore((state) => state.user);
 
@@ -125,8 +125,16 @@ function App() {
                 <Users />
               </AdminRoute>
             } />
-            <Route path="settings" element={<Settings />} />
-            <Route path="storage" element={<StorageConfigs />} />
+            <Route path="settings" element={
+              <AdminRoute>
+                <Settings />
+              </AdminRoute>
+            } />
+            <Route path="storage" element={
+              <AdminRoute>
+                <StorageConfigs />
+              </AdminRoute>
+            } />
             <Route path="api-docs" element={<ApiDocs />} />
             <Route path="account" element={<Account />} />
           </Route>

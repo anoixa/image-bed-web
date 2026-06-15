@@ -63,9 +63,9 @@ const allNavItems: NavItem[] = [
   { path: '/albums', label: '相册管理', icon: Folder },
   { path: '/tokens', label: 'API Token', icon: Key },
   { path: '/users', label: '用户管理', icon: Shield, adminOnly: true },
-  { path: '/storage', label: '存储配置', icon: Database },
+  { path: '/storage', label: '存储配置', icon: Database, adminOnly: true },
   { path: '/api-docs', label: 'API 文档', icon: BookOpen },
-  { path: '/settings', label: '系统设置', icon: Settings },
+  { path: '/settings', label: '系统设置', icon: Settings, adminOnly: true },
   { path: '/account', label: '账号设置', icon: UserCog },
 ];
 

@@ -50,14 +50,13 @@ const refreshTokenApi = (): Promise<LoginSuccessResponse> => {
 // Token 刷新状态管理 - 防止并发重复刷新
 // ============================================
 
-// 当前正在进行的刷新 Promise（全局唯一）
-let currentRefreshPromise: Promise<string> | null = null;
+export interface RefreshedAccessToken {
+  token: string;
+  expiry: number;
+}
 
-// 等待刷新的请求队列
-let refreshSubscribers: Array<{
-  resolve: (token: string) => void;
-  reject: (error: Error) => void;
-}> = [];
+// 当前正在进行的刷新 Promise（全局唯一）
+let currentRefreshPromise: Promise<RefreshedAccessToken> | null = null;
 
 const TOKEN_REFRESH_THRESHOLD = 10 * 60 * 1000; // 10分钟
 // 排除不需要刷新 token 的接口
@@ -76,7 +75,7 @@ function clearAuthState() {
  * 执行实际的 Token 刷新
  * 这是唯一会调用后端刷新接口的地方
  */
-async function performTokenRefresh(): Promise<string> {
+async function performTokenRefresh(): Promise<RefreshedAccessToken> {
   try {
     const response = await refreshTokenApi();
     const newToken = response.access_token.replace('Bearer ', '');
@@ -84,18 +83,9 @@ async function performTokenRefresh(): Promise<string> {
 
     setAuthToken(newToken, newExpiry);
 
-    // 通知所有等待的请求
-    refreshSubscribers.forEach(({ resolve }) => resolve(newToken));
-    refreshSubscribers = [];
-
-    return newToken;
+    return { token: newToken, expiry: newExpiry };
   } catch (error) {
-    // 刷新失败，拒绝所有等待的请求
     const errMessage = error instanceof Error ? error.message : 'Token 刷新失败';
-    refreshSubscribers.forEach(({ reject }) =>
-      reject(new Error(errMessage))
-    );
-    refreshSubscribers = [];
 
     // 如果是账户被禁用，在跳转前记录标记，供登录页展示
     if (errMessage.toLowerCase().includes('account disabled')) {
@@ -113,20 +103,11 @@ async function performTokenRefresh(): Promise<string> {
  * 获取刷新 Promise（如果不存在则创建）
  * 这是防止并发刷新的核心机制
  */
-function getOrCreateRefreshPromise(): Promise<string> {
+export function refreshAccessTokenSingleFlight(): Promise<RefreshedAccessToken> {
   if (!currentRefreshPromise) {
     currentRefreshPromise = performTokenRefresh();
   }
   return currentRefreshPromise;
-}
-
-/**
- * 添加一个刷新订阅者，等待刷新完成
- */
-function waitForRefresh(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    refreshSubscribers.push({ resolve, reject });
-  });
 }
 
 /**
@@ -156,7 +137,7 @@ async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
   // 关键：如果有正在进行的刷新，等待它完成（而不是启动新的刷新）
   if (currentRefreshPromise) {
     try {
-      return await waitForRefresh();
+      return (await currentRefreshPromise).token;
     } catch {
       return null;
     }
@@ -164,7 +145,7 @@ async function checkAndRefreshTokenIfNeeded(): Promise<string | null> {
 
   // 启动新的刷新流程
   try {
-    return await getOrCreateRefreshPromise();
+    return (await refreshAccessTokenSingleFlight()).token;
   } catch {
     return null;
   }
@@ -222,8 +203,8 @@ request.interceptors.response.use(
     // 关键：如果有正在进行的刷新，等待它完成
     if (currentRefreshPromise) {
       try {
-        const newToken = await waitForRefresh();
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        const refreshed = await currentRefreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${refreshed.token}`;
         return request(originalRequest);
       } catch (refreshError) {
         return Promise.reject(refreshError);
@@ -232,8 +213,8 @@ request.interceptors.response.use(
 
     // 启动新的刷新流程
     try {
-      const newToken = await getOrCreateRefreshPromise();
-      originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      const refreshed = await refreshAccessTokenSingleFlight();
+      originalRequest.headers.Authorization = `Bearer ${refreshed.token}`;
       return request(originalRequest);
     } catch (refreshError) {
       return Promise.reject(refreshError);
