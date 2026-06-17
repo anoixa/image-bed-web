@@ -10,6 +10,7 @@ import { uploadImageWithProgress, uploadImagesWithProgress } from '@/api/images'
 import { toast } from '@/components/ui/use-toast';
 import type { UploadImageResponse, Image } from '@/types';
 import { reconcileBatchUploadResults } from '@/lib/uploadResults';
+import { createThrottledProgressUpdater } from '@/lib/uploadProgress';
 
 // 批量链接展示组件
 interface BatchLinksContentProps {
@@ -362,6 +363,10 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
     if (pendingFiles.length === 1) {
       const fileItem = pendingFiles[0];
       updateFileStatus(fileItem.id, { status: 'uploading', progress: 0 });
+      const progressUpdater = createThrottledProgressUpdater((progress) => {
+        updateFileStatus(fileItem.id, { progress });
+        setTotalProgress(progress);
+      });
 
       try {
         const strategyId = storageId ? parseInt(storageId, 10) : undefined;
@@ -370,10 +375,10 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
           true,
           strategyId,
           (progress) => {
-            updateFileStatus(fileItem.id, { progress });
-            setTotalProgress(progress);
+            progressUpdater.update(progress);
           }
         );
+        progressUpdater.cancel();
         updateFileStatus(fileItem.id, {
           status: 'success',
           progress: 100,
@@ -391,6 +396,7 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
         setCurrentLinks(links);
         setShowLinks(true);
       } catch (error) {
+        progressUpdater.cancel();
         const errorMsg = error instanceof Error ? error.message : '上传失败';
         updateFileStatus(fileItem.id, {
           status: 'error',
@@ -407,6 +413,10 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
       // 批量上传：使用批量 API 带总进度
       const pendingIds = new Set(pendingFiles.map((file) => file.id));
       updateFilesStatus(pendingIds, { status: 'uploading', progress: 0, errorMessage: undefined });
+      const progressUpdater = createThrottledProgressUpdater((progress) => {
+        setTotalProgress(progress);
+        updateFilesStatus(pendingIds, { progress });
+      });
 
       try {
         const strategyId = storageId ? parseInt(storageId, 10) : undefined;
@@ -416,11 +426,10 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
           true,
           strategyId,
           (progress) => {
-            setTotalProgress(progress);
-            // 所有文件的进度与总进度保持一致
-            updateFilesStatus(pendingIds, { progress });
+            progressUpdater.update(progress);
           }
         );
+        progressUpdater.cancel();
 
         const { updates, uploadedImages } = reconcileBatchUploadResults(
           pendingFiles.map((file) => ({ id: file.id, filename: file.file.name })),
@@ -457,13 +466,12 @@ export default function UploadModal({ open, onOpenChange, onSuccess, storageId }
           variant: errorCount > 0 ? 'destructive' : 'default',
         });
       } catch (error) {
+        progressUpdater.cancel();
         const errorMsg = error instanceof Error ? error.message : '上传失败';
-        pendingFiles.forEach((f) => {
-          updateFileStatus(f.id, {
-            status: 'error',
-            progress: 0,
-            errorMessage: errorMsg,
-          });
+        updateFilesStatus(pendingIds, {
+          status: 'error',
+          progress: 0,
+          errorMessage: errorMsg,
         });
         toast({
           title: '上传失败',
