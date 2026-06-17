@@ -21,6 +21,16 @@ import { isRequestCanceled } from '@/lib/request';
 import { Link, useSearchParams } from 'react-router-dom';
 import ConfirmDialog from './ConfirmDialog';
 import AlbumSelectModal from './AlbumSelectModal';
+import {
+  applyGalleryFiltersToParams,
+  DEFAULT_GALLERY_FILTERS,
+  parseGalleryFilters,
+  type GalleryFilters,
+  type GalleryAlbumFilter,
+  type GallerySortBy,
+  type GallerySortOrder,
+  type GalleryVisibilityFilter,
+} from '@/lib/galleryFilters';
 
 interface ImageGalleryProps {
   albumId?: number | null;
@@ -29,7 +39,8 @@ interface ImageGalleryProps {
 }
 
 export default function ImageGallery({ albumId, title: customTitle, subtitle: customSubtitle }: ImageGalleryProps = {}) {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlFilters = parseGalleryFilters(searchParams);
   const urlAlbumId = searchParams.get('album_id');
   const effectiveAlbumId = albumId ?? (urlAlbumId ? parseInt(urlAlbumId, 10) : null);
   const searchQuery = searchParams.get('search') || undefined;
@@ -45,10 +56,10 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const [hasMore, setHasMore] = useState(true);
 
   // 筛选状态
-  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all');
-  const [albumFilter, setAlbumFilter] = useState<number | 'all'>(effectiveAlbumId ?? 'all');
-  const [sortBy, setSortBy] = useState<'created_at' | 'file_size'>('created_at');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [visibilityFilter, setVisibilityFilterState] = useState<GalleryVisibilityFilter>(urlFilters.visibility);
+  const [albumFilter, setAlbumFilterState] = useState<GalleryAlbumFilter>(effectiveAlbumId ?? urlFilters.album);
+  const [sortBy, setSortByState] = useState<GallerySortBy>(urlFilters.sortBy);
+  const [sortOrder, setSortOrderState] = useState<GallerySortOrder>(urlFilters.sortOrder);
 
   // Intersection Observer ref
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -87,11 +98,49 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
   const hasActiveFilters = visibilityFilter !== 'all' || albumFilter !== 'all';
 
+  const updateUrlFilters = useCallback((filters: Partial<GalleryFilters>) => {
+    setSearchParams((currentParams) => applyGalleryFiltersToParams(currentParams, filters), {
+      replace: true,
+    });
+  }, [setSearchParams]);
+
+  const setVisibilityFilter = useCallback((filter: GalleryVisibilityFilter) => {
+    setVisibilityFilterState(filter);
+    setCurrentPage(1);
+    updateUrlFilters({ visibility: filter, page: 1 });
+  }, [updateUrlFilters]);
+
+  const setAlbumFilter = useCallback((filter: GalleryAlbumFilter) => {
+    setAlbumFilterState(filter);
+    setCurrentPage(1);
+    updateUrlFilters({ album: filter, page: 1 });
+  }, [updateUrlFilters]);
+
+  const setSortBy = useCallback((sort: GallerySortBy) => {
+    setSortByState(sort);
+    setCurrentPage(1);
+    updateUrlFilters({ sortBy: sort, page: 1 });
+  }, [updateUrlFilters]);
+
+  const setSortOrder = useCallback((order: GallerySortOrder) => {
+    setSortOrderState(order);
+    setCurrentPage(1);
+    updateUrlFilters({ sortOrder: order, page: 1 });
+  }, [updateUrlFilters]);
+
   const resetFilters = () => {
-    setVisibilityFilter('all');
-    setAlbumFilter(effectiveAlbumId || 'all');
-    setSortBy('created_at');
-    setSortOrder('desc');
+    setVisibilityFilterState(DEFAULT_GALLERY_FILTERS.visibility);
+    setAlbumFilterState(effectiveAlbumId || DEFAULT_GALLERY_FILTERS.album);
+    setSortByState(DEFAULT_GALLERY_FILTERS.sortBy);
+    setSortOrderState(DEFAULT_GALLERY_FILTERS.sortOrder);
+    setCurrentPage(1);
+    updateUrlFilters({
+      visibility: DEFAULT_GALLERY_FILTERS.visibility,
+      album: effectiveAlbumId || DEFAULT_GALLERY_FILTERS.album,
+      sortBy: DEFAULT_GALLERY_FILTERS.sortBy,
+      sortOrder: DEFAULT_GALLERY_FILTERS.sortOrder,
+      page: 1,
+    });
   };
 
   const loadImages = useCallback(async (page: number = 1, append: boolean = false) => {
@@ -99,6 +148,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       page,
       append,
       albumFilter,
+      visibilityFilter,
       search: searchQuery?.trim() || '',
       sortBy,
       sortOrder,
@@ -131,6 +181,10 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         params.album_id = albumFilter;
       }
 
+      if (visibilityFilter !== 'all') {
+        params.is_public = visibilityFilter === 'public';
+      }
+
       if (searchQuery && searchQuery.trim()) {
         params.search = searchQuery.trim();
       }
@@ -157,6 +211,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
       setPagination(response);
       setCurrentPage(page);
+      updateUrlFilters({ page });
       setHasLoaded(true);
 
       const totalPages = Math.ceil(total / perPage);
@@ -184,7 +239,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         setHasLoaded(true);
       }
     }
-  }, [albumFilter, searchQuery, sortBy, sortOrder]);
+  }, [albumFilter, searchQuery, sortBy, sortOrder, updateUrlFilters, visibilityFilter]);
 
   useEffect(() => () => requestControllerRef.current?.abort(), []);
 
@@ -200,11 +255,15 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   // 监听 URL 中的 album_id 变化，更新筛选状态
   useEffect(() => {
     if (effectiveAlbumId) {
-      setAlbumFilter(effectiveAlbumId);
+      setAlbumFilterState(effectiveAlbumId);
     } else {
-      setAlbumFilter('all');
+      setAlbumFilterState(urlFilters.album);
     }
-  }, [effectiveAlbumId]);
+    setVisibilityFilterState(urlFilters.visibility);
+    setSortByState(urlFilters.sortBy);
+    setSortOrderState(urlFilters.sortOrder);
+    setCurrentPage(urlFilters.page);
+  }, [effectiveAlbumId, urlFilters.album, urlFilters.page, urlFilters.sortBy, urlFilters.sortOrder, urlFilters.visibility]);
 
   useEffect(() => {
     loadImages(1, false);

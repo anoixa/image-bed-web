@@ -21,6 +21,7 @@ export interface ImageListParams {
   identifier?: string;
   search?: string;
   album_id?: number | null;
+  is_public?: boolean;
   start_time?: number;
   end_time?: number;
   sort?: 'asc' | 'desc';
@@ -47,6 +48,7 @@ export const fetchImages = (
     identifier: params.identifier,
     search: params.search,
     album_id: params.album_id,
+    is_public: params.is_public,
     start_time: params.start_time,
     end_time: params.end_time,
     sort: params.sort || 'desc',
