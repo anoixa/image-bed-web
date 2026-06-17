@@ -408,6 +408,7 @@ export default function JustifiedGallery({
                 onPreview={handlePreview}
                 selectable={isBatchMode}
                 selected={selectedImages.has(image.identifier)}
+                priority={rowIndex === 0}
                 onSelect={onSelectImage}
               />
             ))}

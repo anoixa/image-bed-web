@@ -13,6 +13,7 @@ interface JustifiedImageCardProps {
   onPreview?: (identifier: string) => void;
   selectable?: boolean;
   selected?: boolean;
+  priority?: boolean;
   onSelect?: (identifier: string, selected: boolean) => void;
 }
 
@@ -24,6 +25,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
   onPreview,
   selectable = false,
   selected = false,
+  priority = false,
   onSelect,
 }: JustifiedImageCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -32,6 +34,7 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
   const thumbnailUrl = image.links?.thumbnail || image.thumbnail_url || image.url || '';
   const originalUrl = image.links?.original || image.url || '';
   const previewKey = image.identifier || String(image.id);
+  const imageLabel = image.filename || image.original_name || image.identifier || '图片';
   const imageLoaded = loadedThumbnailUrl === thumbnailUrl;
 
   const handleCopy = async (e: React.MouseEvent) => {
@@ -124,14 +127,18 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
         <img
           key={`img-${image.identifier}`}
           src={thumbnailUrl}
-          alt={image.filename}
+          alt={imageLabel}
+          width={image.width || undefined}
+          height={image.height || undefined}
+          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
           className={`w-full h-full object-cover transition-all duration-300 ${
             selectable ? 'cursor-pointer' : 'cursor-zoom-in'
           } ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
           onClick={handlePreview}
           onLoad={() => setLoadedThumbnailUrl(thumbnailUrl)}
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
           decoding="async"
+          fetchPriority={priority ? 'high' : 'auto'}
           style={{ pointerEvents: selectable ? 'none' : 'auto' }}
         />
         
@@ -149,8 +156,8 @@ const JustifiedImageCard = memo(function JustifiedImageCard({
 
       {/* 信息显示（左下角） */}
       <div className="absolute bottom-0 left-0 right-0 p-3 pointer-events-none">
-        <p className="text-white text-xs font-medium truncate drop-shadow-md" title={image.filename}>
-          {image.filename}
+        <p className="text-white text-xs font-medium truncate drop-shadow-md" title={imageLabel}>
+          {imageLabel}
         </p>
         <p className="text-white/70 text-[10px] mt-0.5">
           {formatDate(image.created_at)}
