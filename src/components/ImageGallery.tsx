@@ -107,25 +107,25 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const setVisibilityFilter = useCallback((filter: GalleryVisibilityFilter) => {
     setVisibilityFilterState(filter);
     setCurrentPage(1);
-    updateUrlFilters({ visibility: filter, page: 1 });
+    updateUrlFilters({ visibility: filter });
   }, [updateUrlFilters]);
 
   const setAlbumFilter = useCallback((filter: GalleryAlbumFilter) => {
     setAlbumFilterState(filter);
     setCurrentPage(1);
-    updateUrlFilters({ album: filter, page: 1 });
+    updateUrlFilters({ album: filter });
   }, [updateUrlFilters]);
 
   const setSortBy = useCallback((sort: GallerySortBy) => {
     setSortByState(sort);
     setCurrentPage(1);
-    updateUrlFilters({ sortBy: sort, page: 1 });
+    updateUrlFilters({ sortBy: sort });
   }, [updateUrlFilters]);
 
   const setSortOrder = useCallback((order: GallerySortOrder) => {
     setSortOrderState(order);
     setCurrentPage(1);
-    updateUrlFilters({ sortOrder: order, page: 1 });
+    updateUrlFilters({ sortOrder: order });
   }, [updateUrlFilters]);
 
   const resetFilters = () => {
@@ -139,7 +139,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       album: effectiveAlbumId || DEFAULT_GALLERY_FILTERS.album,
       sortBy: DEFAULT_GALLERY_FILTERS.sortBy,
       sortOrder: DEFAULT_GALLERY_FILTERS.sortOrder,
-      page: 1,
     });
   };
 
@@ -211,7 +210,6 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
 
       setPagination(response);
       setCurrentPage(page);
-      updateUrlFilters({ page });
       setHasLoaded(true);
 
       const totalPages = Math.ceil(total / perPage);
@@ -239,9 +237,15 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         setHasLoaded(true);
       }
     }
-  }, [albumFilter, searchQuery, sortBy, sortOrder, updateUrlFilters, visibilityFilter]);
+  }, [albumFilter, searchQuery, sortBy, sortOrder, visibilityFilter]);
 
   useEffect(() => () => requestControllerRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (searchParams.has('page')) {
+      updateUrlFilters({});
+    }
+  }, [searchParams, updateUrlFilters]);
 
   // 监听外部刷新事件（如上传成功后）
   useEffect(() => {
@@ -262,8 +266,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     setVisibilityFilterState(urlFilters.visibility);
     setSortByState(urlFilters.sortBy);
     setSortOrderState(urlFilters.sortOrder);
-    setCurrentPage(urlFilters.page);
-  }, [effectiveAlbumId, urlFilters.album, urlFilters.page, urlFilters.sortBy, urlFilters.sortOrder, urlFilters.visibility]);
+  }, [effectiveAlbumId, urlFilters.album, urlFilters.sortBy, urlFilters.sortOrder, urlFilters.visibility]);
 
   useEffect(() => {
     loadImages(1, false);

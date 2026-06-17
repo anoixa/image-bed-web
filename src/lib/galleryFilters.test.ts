@@ -12,21 +12,19 @@ describe('gallery filter URL state', () => {
       album: 12,
       sortBy: 'file_size',
       sortOrder: 'asc',
-      page: 3,
     });
   });
 
-  it('writes non-default filters and keeps unrelated params', () => {
-    const params = applyGalleryFiltersToParams(new URLSearchParams('search=logo'), {
+  it('writes non-default filters, keeps unrelated params, and drops pagination', () => {
+    const params = applyGalleryFiltersToParams(new URLSearchParams('search=logo&page=3'), {
       visibility: 'public',
       album: 5,
       sortBy: 'file_size',
       sortOrder: 'asc',
-      page: 2,
     });
 
     expect(params.toString()).toBe(
-      'search=logo&visibility=public&album_id=5&sort_by=file_size&sort=asc&page=2'
+      'search=logo&visibility=public&album_id=5&sort_by=file_size&sort=asc'
     );
   });
 
@@ -38,7 +36,6 @@ describe('gallery filter URL state', () => {
         album: 'all',
         sortBy: 'created_at',
         sortOrder: 'desc',
-        page: 1,
       }
     );
 
