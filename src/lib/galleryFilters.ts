@@ -8,7 +8,6 @@ export interface GalleryFilters {
   album: GalleryAlbumFilter;
   sortBy: GallerySortBy;
   sortOrder: GallerySortOrder;
-  page: number;
 }
 
 export const DEFAULT_GALLERY_FILTERS: GalleryFilters = {
@@ -16,7 +15,6 @@ export const DEFAULT_GALLERY_FILTERS: GalleryFilters = {
   album: 'all',
   sortBy: 'created_at',
   sortOrder: 'desc',
-  page: 1,
 };
 
 function parsePositiveInteger(value: string | null): number | null {
@@ -30,7 +28,6 @@ export function parseGalleryFilters(params: URLSearchParams): GalleryFilters {
   const albumId = parsePositiveInteger(params.get('album_id'));
   const sortBy = params.get('sort_by');
   const sortOrder = params.get('sort');
-  const page = parsePositiveInteger(params.get('page'));
 
   return {
     visibility: visibility === 'public' || visibility === 'private'
@@ -39,7 +36,6 @@ export function parseGalleryFilters(params: URLSearchParams): GalleryFilters {
     album: albumId ?? DEFAULT_GALLERY_FILTERS.album,
     sortBy: sortBy === 'file_size' ? sortBy : DEFAULT_GALLERY_FILTERS.sortBy,
     sortOrder: sortOrder === 'asc' ? sortOrder : DEFAULT_GALLERY_FILTERS.sortOrder,
-    page: page ?? DEFAULT_GALLERY_FILTERS.page,
   };
 }
 
@@ -48,6 +44,7 @@ export function applyGalleryFiltersToParams(
   filters: Partial<GalleryFilters>
 ): URLSearchParams {
   const nextParams = new URLSearchParams(params);
+  nextParams.delete('page');
 
   if (filters.visibility !== undefined) {
     if (filters.visibility === 'all') {
@@ -78,14 +75,6 @@ export function applyGalleryFiltersToParams(
       nextParams.delete('sort');
     } else {
       nextParams.set('sort', filters.sortOrder);
-    }
-  }
-
-  if (filters.page !== undefined) {
-    if (filters.page <= 1) {
-      nextParams.delete('page');
-    } else {
-      nextParams.set('page', String(filters.page));
     }
   }
 
