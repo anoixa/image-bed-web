@@ -56,7 +56,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [currentAlbum, setCurrentAlbum] = useState<Album | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
 
   // 筛选状态
   const [visibilityFilter, setVisibilityFilterState] = useState<GalleryVisibilityFilter>(urlFilters.visibility);
@@ -301,10 +301,16 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   }, [loadImages]);
 
   const loadNextPage = useCallback((ignoreLoadMoreError: boolean = false) => {
-    if (hasMore && !isBusy && (ignoreLoadMoreError || !loadMoreError)) {
+    if (
+      hasLoaded &&
+      inFlightRequestRef.current === null &&
+      hasMore &&
+      !isBusy &&
+      (ignoreLoadMoreError || !loadMoreError)
+    ) {
       loadImages(currentPage + 1, true);
     }
-  }, [currentPage, hasMore, isBusy, loadImages, loadMoreError]);
+  }, [currentPage, hasLoaded, hasMore, isBusy, loadImages, loadMoreError]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
