@@ -11,6 +11,10 @@ import type { LoginSuccessResponse } from '@/types';
 import { clearAuthToken, setAuthToken } from '@/lib/authToken';
 import { refreshAccessTokenSingleFlight } from '@/lib/request';
 
+interface InitAuthOptions {
+  allowRefresh?: boolean;
+}
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
@@ -26,7 +30,7 @@ interface AuthState {
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<boolean>;
   checkAndRefreshToken: () => Promise<boolean>;
-  initAuth: () => Promise<void>;
+  initAuth: (options?: InitAuthOptions) => Promise<void>;
   // Debug
   forceExpireToken: () => void;
 }
@@ -185,23 +189,27 @@ export const useAuthStore = create<AuthState>()(
         return await refreshAccessToken();
       },
 
-      initAuth: async () => {
+      initAuth: async ({ allowRefresh = true }: InitAuthOptions = {}) => {
         const { accessToken, accessTokenExpiry, refreshAccessToken } = get();
 
         // 如果没有 accessToken，尝试用 refresh_token cookie 刷新一次
         // （OAuth 登录后后端只设置了 refresh_token cookie）
         if (!accessToken) {
-          const ok = await refreshAccessToken();
-          if (!ok) {
+          if (allowRefresh) {
+            const ok = await refreshAccessToken();
+            if (ok) {
+              return;
+            }
             clearAuthToken();
-            set({
-              user: null,
-              accessToken: null,
-              accessTokenExpiry: null,
-              isAuthenticated: false,
-              twoFATicket: null,
-            });
           }
+          set({
+            user: null,
+            accessToken: null,
+            accessTokenExpiry: null,
+            isAuthenticated: false,
+            isRefreshing: false,
+            twoFATicket: null,
+          });
           return;
         }
 
