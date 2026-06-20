@@ -1,8 +1,14 @@
 import { get, post, put, del } from '@/lib/request';
+import { createPromiseCache } from '@/lib/apiCache';
 import type { StorageConfig, CreateStorageConfigRequest, TestConfigRequest, TestConfigResponse, ConfigCategory, TransferModeConfig, TransferModeRequest } from '@/types';
 
 const MASKED_SECRET_PATTERN = /^(?:\*+|•+|●+|x+|<masked>|masked|redacted)$/i;
 const SENSITIVE_CONFIG_KEY_PATTERN = /(?:secret|password|token|private_key|api_key)/i;
+const storageConfigsCache = createPromiseCache<StorageConfig[]>();
+
+export function invalidateStorageConfigsCache() {
+  storageConfigsCache.invalidate();
+}
 
 export function isMaskedSensitiveValue(value: unknown): boolean {
   return typeof value === 'string' && MASKED_SECRET_PATTERN.test(value.trim());
@@ -40,7 +46,9 @@ export const fetchStorageConfigs = (category?: ConfigCategory, enabledOnly?: boo
   if (category) params.append('category', category);
   if (enabledOnly !== undefined) params.append('enabled_only', String(enabledOnly));
   const query = params.toString() ? `?${params.toString()}` : '';
-  return get<StorageConfig[]>(`/api/v1/admin/configs${query}`);
+  return storageConfigsCache.get(`${category ?? 'all'}:${enabledOnly ?? 'all'}`, () => (
+    get<StorageConfig[]>(`/api/v1/admin/configs${query}`)
+  ));
 };
 
 // 获取单个存储配置 - GET /api/v1/admin/configs/{id}
@@ -50,32 +58,50 @@ export const fetchStorageConfigById = (id: number, maskSensitive: boolean = true
 
 // 创建存储配置 - POST /api/v1/admin/configs
 export const createStorageConfig = (data: CreateStorageConfigRequest): Promise<StorageConfig> => {
-  return post<StorageConfig>('/api/v1/admin/configs', data);
+  return post<StorageConfig>('/api/v1/admin/configs', data).then((config) => {
+    invalidateStorageConfigsCache();
+    return config;
+  });
 };
 
 // 更新存储配置 - PUT /api/v1/admin/configs/{id}
 export const updateStorageConfig = (id: number, data: Partial<CreateStorageConfigRequest>): Promise<StorageConfig> => {
-  return put<StorageConfig>(`/api/v1/admin/configs/${id}`, sanitizeStorageConfigUpdate(data));
+  return put<StorageConfig>(`/api/v1/admin/configs/${id}`, sanitizeStorageConfigUpdate(data)).then((config) => {
+    invalidateStorageConfigsCache();
+    return config;
+  });
 };
 
 // 删除存储配置 - DELETE /api/v1/admin/configs/{id}
 export const deleteStorageConfig = (id: number): Promise<void> => {
-  return del(`/api/v1/admin/configs/${id}`, { expectData: false });
+  return del<void>(`/api/v1/admin/configs/${id}`, { expectData: false }).then((result) => {
+    invalidateStorageConfigsCache();
+    return result;
+  });
 };
 
 // 设置默认配置 - POST /api/v1/admin/configs/{id}/default
 export const setDefaultStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/default`, undefined, { expectData: false });
+  return post<void>(`/api/v1/admin/configs/${id}/default`, undefined, { expectData: false }).then((result) => {
+    invalidateStorageConfigsCache();
+    return result;
+  });
 };
 
 // 启用配置 - POST /api/v1/admin/configs/{id}/enable
 export const enableStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/enable`, undefined, { expectData: false });
+  return post<void>(`/api/v1/admin/configs/${id}/enable`, undefined, { expectData: false }).then((result) => {
+    invalidateStorageConfigsCache();
+    return result;
+  });
 };
 
 // 禁用配置 - POST /api/v1/admin/configs/{id}/disable
 export const disableStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/configs/${id}/disable`, undefined, { expectData: false });
+  return post<void>(`/api/v1/admin/configs/${id}/disable`, undefined, { expectData: false }).then((result) => {
+    invalidateStorageConfigsCache();
+    return result;
+  });
 };
 
 // 测试配置连接 - POST /api/v1/admin/configs/{id}/test
@@ -95,7 +121,10 @@ export const fetchStorageProviders = (): Promise<{ category: string; name: strin
 
 // 重新加载存储配置 - POST /api/v1/admin/storage/reload/{id}
 export const reloadStorageConfig = (id: number): Promise<void> => {
-  return post(`/api/v1/admin/storage/reload/${id}`, undefined, { expectData: false });
+  return post<void>(`/api/v1/admin/storage/reload/${id}`, undefined, { expectData: false }).then((result) => {
+    invalidateStorageConfigsCache();
+    return result;
+  });
 };
 
 // 获取全局 Transfer Mode 配置 - GET /api/v1/admin/transfer-mode

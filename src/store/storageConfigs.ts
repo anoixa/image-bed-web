@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchStorageConfigs } from '@/api/configs';
+import { fetchStorageConfigs, invalidateStorageConfigsCache } from '@/api/configs';
 import type { StorageConfig } from '@/types';
 
 interface StorageConfigsState {
@@ -30,6 +30,7 @@ export const useStorageConfigsStore = create<StorageConfigsState>()((set) => ({
 
   refreshStorageConfigs: async () => {
     try {
+      invalidateStorageConfigsCache();
       const configs = await fetchStorageConfigs();
       const configArray = Array.isArray(configs) ? configs : [];
       const filteredConfigs = configArray.filter(config => config.category === 'storage' && config.is_enabled);

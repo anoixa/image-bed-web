@@ -1,4 +1,5 @@
 import { get, post, put, del } from '@/lib/request';
+import { createPromiseCache } from '@/lib/apiCache';
 import type {
   LoginResponse,
   LoginSuccessResponse,
@@ -12,6 +13,14 @@ import type {
   TwoFAToggleRequest,
   TwoFAVerifyRequest,
 } from '@/types';
+
+const authCapabilitiesCache = createPromiseCache<AuthCapabilities>();
+const authSettingsCache = createPromiseCache<AuthSettings>();
+
+export function invalidateAuthConfigCache() {
+  authCapabilitiesCache.invalidate();
+  authSettingsCache.invalidate();
+}
 
 // 登录
 export const login = (username: string, password: string): Promise<LoginResponse> => {
@@ -69,7 +78,7 @@ export const disable2FA = (data: TwoFAToggleRequest): Promise<void> => {
 
 // 获取登录能力
 export const getAuthCapabilities = (): Promise<AuthCapabilities> => {
-  return get<AuthCapabilities>('/api/auth/capabilities');
+  return authCapabilitiesCache.get('auth-capabilities', () => get<AuthCapabilities>('/api/auth/capabilities'));
 };
 
 // 获取 OAuth Providers（登录页一般直接用 capabilities）
@@ -108,10 +117,13 @@ export interface UpdateAuthSettingsRequest {
 
 // 获取管理员登录设置
 export const fetchAuthSettings = (): Promise<AuthSettings> => {
-  return get<AuthSettings>('/api/v1/admin/auth/settings');
+  return authSettingsCache.get('auth-settings', () => get<AuthSettings>('/api/v1/admin/auth/settings'));
 };
 
 // 更新管理员登录设置
 export const updateAuthSettings = (data: UpdateAuthSettingsRequest): Promise<AuthSettings> => {
-  return put<AuthSettings>('/api/v1/admin/auth/settings', data);
+  return put<AuthSettings>('/api/v1/admin/auth/settings', data).then((settings) => {
+    invalidateAuthConfigCache();
+    return settings;
+  });
 };
