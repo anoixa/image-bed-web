@@ -24,7 +24,7 @@ describe('buildRandomImageURL', () => {
 });
 
 describe('fetchImages', () => {
-  it('passes visibility filters through as is_public', async () => {
+  it('passes visibility and sorting filters to the backend', async () => {
     let requestBody: unknown;
     server.use(
       http.post('*/api/v1/images', async ({ request }) => {
@@ -42,8 +42,18 @@ describe('fetchImages', () => {
       })
     );
 
-    await fetchImages({ page: 1, limit: 20, is_public: false });
+    await fetchImages({
+      page: 1,
+      limit: 20,
+      is_public: false,
+      sort_by: 'file_size',
+      sort: 'asc',
+    });
 
-    expect(requestBody).toMatchObject({ is_public: false });
+    expect(requestBody).toMatchObject({
+      is_public: false,
+      sort_by: 'file_size',
+      sort: 'asc',
+    });
   });
 });

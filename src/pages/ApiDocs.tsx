@@ -75,6 +75,7 @@ const imageEndpoints: ApiEndpoint[] = [
       { name: 'limit', type: 'number', required: false, description: '每页数量，默认 20' },
       { name: 'search', type: 'string', required: false, description: '搜索关键词（文件名）' },
       { name: 'album_id', type: 'number', required: false, description: '相册ID筛选' },
+      { name: 'sort_by', type: 'string', required: false, description: '排序字段：created_at 或 file_size' },
       { name: 'sort', type: 'string', required: false, description: '排序：asc 或 desc' },
     ],
     response: `{

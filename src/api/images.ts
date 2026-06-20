@@ -24,6 +24,7 @@ export interface ImageListParams {
   is_public?: boolean;
   start_time?: number;
   end_time?: number;
+  sort_by?: 'created_at' | 'file_size';
   sort?: 'asc' | 'desc';
 }
 
@@ -51,6 +52,7 @@ export const fetchImages = (
     is_public: params.is_public,
     start_time: params.start_time,
     end_time: params.end_time,
+    sort_by: params.sort_by || 'created_at',
     sort: params.sort || 'desc',
   }, config).then((response) => {
     const mappedItems = response.images.map((item: Image) => ({

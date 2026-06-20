@@ -193,6 +193,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       const params: Parameters<typeof fetchImages>[0] = {
         page,
         limit: 20,
+        sort_by: sortBy,
         sort: sortOrder,
       };
 
@@ -214,11 +215,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         return;
       }
 
-      const items = [...(response?.items || [])].sort((a, b) => {
-        const aValue = sortBy === 'file_size' ? a.file_size : a.created_at;
-        const bValue = sortBy === 'file_size' ? b.file_size : b.created_at;
-        return sortOrder === 'desc' ? bValue - aValue : aValue - bValue;
-      });
+      const items = response?.items || [];
       const total = response?.total || 0;
       const perPage = response?.per_page || 20;
 
