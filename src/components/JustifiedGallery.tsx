@@ -19,8 +19,10 @@ import { buildGalleryRows, GALLERY_GAP } from './justifiedGalleryLayout';
 interface JustifiedGalleryProps {
   images: Image[];
   loading: boolean;
+  refreshing?: boolean;
   hasMore: boolean;
   error: string | null;
+  loadMoreError?: string | null;
   currentAlbum?: Album | null;
   albums?: Album[];
   visibilityFilter?: 'all' | 'public' | 'private';
@@ -44,6 +46,8 @@ interface JustifiedGalleryProps {
   setIsBatchMode?: (mode: boolean) => void;
   effectiveAlbumId?: number | null;
   loaderRef?: React.RefObject<HTMLDivElement | null>;
+  onRetry?: () => void;
+  onRetryLoadMore?: () => void;
 }
 
 const GAP = GALLERY_GAP;
@@ -54,8 +58,10 @@ const getImagePreviewKey = (image: Image) => image.identifier || String(image.id
 export default function JustifiedGallery({
   images,
   loading,
+  refreshing = false,
   hasMore,
   error,
+  loadMoreError = null,
   currentAlbum,
   albums = [],
   visibilityFilter = 'all',
@@ -79,6 +85,8 @@ export default function JustifiedGallery({
   setIsBatchMode,
   effectiveAlbumId,
   loaderRef,
+  onRetry,
+  onRetryLoadMore,
 }: JustifiedGalleryProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -175,7 +183,7 @@ export default function JustifiedGallery({
     setAlbumFilter?.('all');
   };
 
-  if (error) {
+  if (error && images.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
@@ -183,7 +191,7 @@ export default function JustifiedGallery({
         </div>
         <h3 className="text-lg font-medium text-slate-800 mb-2">加载失败</h3>
         <p className="text-slate-500 mb-6">{error}</p>
-        <Button onClick={() => window.location.reload()}>重新加载</Button>
+        <Button onClick={onRetry}>重新加载</Button>
       </div>
     );
   }
@@ -359,6 +367,25 @@ export default function JustifiedGallery({
         </div>
       )}
 
+      {refreshing && (
+        <div className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-700">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>正在更新列表...</span>
+        </div>
+      )}
+
+      {error && images.length > 0 && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          <span>刷新失败，当前显示上一次结果：{error}</span>
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            重试
+          </Button>
+        </div>
+      )}
+
       {/* 确认对话框 */}
       <ConfirmDialog
         open={showDeleteConfirm}
@@ -428,13 +455,24 @@ export default function JustifiedGallery({
 
       {/* 加载更多 */}
       <div ref={loaderRef} className="flex justify-center py-8">
+        {loadMoreError && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          >
+            <span>加载更多失败：{loadMoreError}</span>
+            <Button variant="outline" size="sm" onClick={onRetryLoadMore}>
+              重试加载更多
+            </Button>
+          </div>
+        )}
         {loading && hasMore && (
           <div className="flex items-center gap-2 text-slate-500">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span>加载中...</span>
           </div>
         )}
-        {!hasMore && images.length > 0 && (
+        {!loadMoreError && !hasMore && images.length > 0 && (
           <p className="text-slate-400 text-sm">已加载全部 {images.length} 张图片</p>
         )}
       </div>

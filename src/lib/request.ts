@@ -103,7 +103,9 @@ const EXCLUDE_FROM_REFRESH = ['/api/auth/login', '/api/auth/refresh', '/api/auth
 function clearAuthState() {
   clearAuthToken();
   localStorage.removeItem('auth-storage');
-  window.location.href = '/login';
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login');
+  }
 }
 
 /**

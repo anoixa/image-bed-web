@@ -74,7 +74,7 @@ function App() {
 
   // 应用初始化：恢复认证状态并获取用户信息
   useEffect(() => {
-    initAuth().then(() => setInitialized(true));
+    initAuth({ allowRefresh: window.location.pathname !== '/login' }).then(() => setInitialized(true));
   }, [initAuth]);
 
   useEffect(() => {
