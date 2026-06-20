@@ -46,11 +46,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const searchQuery = searchParams.get('search') || undefined;
 
   const [images, setImages] = useState<Image[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [, setPagination] = useState<PaginatedResponse<Image> | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [currentAlbum, setCurrentAlbum] = useState<Album | null>(null);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [hasMore, setHasMore] = useState(true);
@@ -67,6 +70,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   const inFlightRequestRef = useRef<string | null>(null);
   const latestRequestIdRef = useRef(0);
   const requestControllerRef = useRef<AbortController | null>(null);
+  const imagesCountRef = useRef(0);
 
   // 批量操作状态
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -79,6 +83,10 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   // 相册选择弹窗状态
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
   const [currentImageForAlbum, setCurrentImageForAlbum] = useState<string | null>(null);
+
+  useEffect(() => {
+    imagesCountRef.current = images.length;
+  }, [images.length]);
 
   // 加载相册列表
   useEffect(() => {
@@ -97,6 +105,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
   }, [albums, effectiveAlbumId]);
 
   const hasActiveFilters = visibilityFilter !== 'all' || albumFilter !== 'all';
+  const isBusy = initialLoading || refreshing || loadingMore;
 
   const updateUrlFilters = useCallback((filters: Partial<GalleryFilters>) => {
     setSearchParams((currentParams) => applyGalleryFiltersToParams(currentParams, filters), {
@@ -164,10 +173,21 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     latestRequestIdRef.current += 1;
     const requestId = latestRequestIdRef.current;
 
-    if (page === 1) {
-      setLoading(true);
+    const loadMode = append ? 'append' : (imagesCountRef.current === 0 ? 'initial' : 'refresh');
+
+    if (loadMode === 'append') {
+      setLoadingMore(true);
+      setLoadMoreError(null);
+    } else {
+      setLoadingMore(false);
+      setLoadMoreError(null);
+      setError(null);
+      if (loadMode === 'initial') {
+        setInitialLoading(true);
+      } else {
+        setRefreshing(true);
+      }
     }
-    setError(null);
 
     try {
       const params: Parameters<typeof fetchImages>[0] = {
@@ -211,6 +231,8 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       setPagination(response);
       setCurrentPage(page);
       setHasLoaded(true);
+      setError(null);
+      setLoadMoreError(null);
 
       const totalPages = Math.ceil(total / perPage);
       setHasMore(page < totalPages && items.length > 0);
@@ -219,10 +241,17 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         return;
       }
       const errorMsg = err instanceof Error ? err.message : '加载失败';
-      setError(errorMsg);
-      if (page === 1) {
+      if (loadMode === 'append') {
+        setLoadMoreError(errorMsg);
         toast({
-          title: '加载失败',
+          title: '加载更多失败',
+          description: errorMsg,
+          variant: 'destructive',
+        });
+      } else {
+        setError(errorMsg);
+        toast({
+          title: loadMode === 'initial' ? '加载失败' : '刷新失败',
           description: errorMsg,
           variant: 'destructive',
         });
@@ -233,7 +262,9 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       }
       if (requestId === latestRequestIdRef.current) {
         requestControllerRef.current = null;
-        setLoading(false);
+        setInitialLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
         setHasLoaded(true);
       }
     }
@@ -272,12 +303,18 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     loadImages(1, false);
   }, [loadImages]);
 
+  const loadNextPage = useCallback((ignoreLoadMoreError: boolean = false) => {
+    if (hasMore && !isBusy && (ignoreLoadMoreError || !loadMoreError)) {
+      loadImages(currentPage + 1, true);
+    }
+  }, [currentPage, hasMore, isBusy, loadImages, loadMoreError]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         const target = entries[0];
-        if (target.isIntersecting && hasMore && !loading) {
-          loadImages(currentPage + 1, true);
+        if (target.isIntersecting) {
+          loadNextPage();
         }
       },
       {
@@ -297,7 +334,24 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         observer.unobserve(currentLoader);
       }
     };
-  }, [hasMore, loading, currentPage, loadImages]);
+  }, [loadNextPage]);
+
+  useEffect(() => {
+    const handleScrollNearBottom = () => {
+      const scrollTop = window.scrollY || document.documentElement.scrollTop;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const scrollHeight = document.documentElement.scrollHeight;
+
+      if (scrollHeight - scrollTop - viewportHeight < 600) {
+        loadNextPage();
+      }
+    };
+
+    window.addEventListener('scroll', handleScrollNearBottom, { passive: true });
+    handleScrollNearBottom();
+
+    return () => window.removeEventListener('scroll', handleScrollNearBottom);
+  }, [loadNextPage]);
 
   // 显示单张图片删除确认
   const handleShowDeleteConfirm = (identifier: string) => {
@@ -451,6 +505,14 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
     return sortOrder === 'desc' ? '文件大小 (大→小)' : '文件大小 (小→大)';
   };
 
+  const retryFirstPage = useCallback(() => {
+    loadImages(1, false);
+  }, [loadImages]);
+
+  const retryLoadMore = useCallback(() => {
+    loadNextPage(true);
+  }, [loadNextPage]);
+
   // 标题和副标题（优先使用传入的自定义标题）
   const title = customTitle ?? (currentAlbum ? currentAlbum.name : '全部图片');
   const subtitle = customSubtitle ?? (currentAlbum
@@ -459,7 +521,7 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         ? `相册: ${getAlbumLabel()}`
         : `${images.length} 张图片`));
 
-  if (!hasLoaded) {
+  if (!hasLoaded || (initialLoading && images.length === 0)) {
     return (
       <PhotoProvider>
         <div className="space-y-8">
@@ -492,8 +554,8 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         </div>
         <h3 className="text-lg font-medium text-slate-800 mb-2">加载失败</h3>
         <p className="text-slate-500 mb-6">{error}</p>
-        <Button onClick={() => loadImages(1, false)}>
-          重新加载
+        <Button onClick={retryFirstPage} disabled={initialLoading}>
+          {initialLoading ? '加载中...' : '重新加载'}
         </Button>
       </div>
     );
@@ -698,9 +760,11 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
       {/* Justified Layout Gallery - 等高瀑布流布局 */}
       <JustifiedGallery
         images={images}
-        loading={loading}
+        loading={loadingMore}
+        refreshing={refreshing}
         hasMore={hasMore}
         error={error}
+        loadMoreError={loadMoreError}
         currentAlbum={currentAlbum}
         albums={albums}
         visibilityFilter={visibilityFilter}
@@ -724,6 +788,8 @@ export default function ImageGallery({ albumId, title: customTitle, subtitle: cu
         setIsBatchMode={setIsBatchMode}
         effectiveAlbumId={effectiveAlbumId}
         loaderRef={loaderRef}
+        onRetry={retryFirstPage}
+        onRetryLoadMore={retryLoadMore}
       />
 
       {/* 相册选择弹窗 */}
